@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
+import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.OperatorConstants;
@@ -162,6 +163,40 @@ private Command BrightbackAutoPath() {
             drivebase.driveToPose(
                 new Pose2d(new Translation2d(3.3, 0.65), Rotation2d.fromDegrees(0))));
 }
+
+// Auto Commands
+
+private Command RleftfixedGetNotes() {
+    return drivebase.driveToPose(
+        new Pose2d(new Translation2d(8.6, 1.2), Rotation2d.fromDegrees(-23.5)))
+        .andThen(
+            drivebase.driveToPose(
+                new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(-23.5))));
+}
+
+private Command RrightfixedGetNotes() {
+    return drivebase.driveToPose(
+        new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(-155.0)))
+        .andThen(
+            drivebase.driveToPose(
+                new Pose2d(new Translation2d(8.6, 1.2), Rotation2d.fromDegrees(-155.0))));
+}
+
+private Command BleftfixedGetNotes() {
+    return drivebase.driveToPose(
+        new Pose2d(new Translation2d(8.0, 7.0), Rotation2d.fromDegrees(155.0)))
+        .andThen(
+            drivebase.driveToPose(
+                new Pose2d(new Translation2d(8.0, 1.2), Rotation2d.fromDegrees(155.0))));
+}
+
+private Command BrightfixedGetNotes() {
+    return drivebase.driveToPose(
+        new Pose2d(new Translation2d(8.0, 1.2), Rotation2d.fromDegrees(23.5)))
+        .andThen(
+            drivebase.driveToPose(
+                new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(23.5))));
+}
                                                                                    
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -289,11 +324,43 @@ private Command BrightbackAutoPath() {
    *
    * @return the command to run in autonomous
    */
-  public Command getAutonomousCommand()
-  {
-    // Pass in the selected auto from the SmartDashboard as our desired autnomous commmand 
-    return autoChooser.getSelected();
+  public Command getAutonomousCommand() {
+    return new SequentialCommandGroup(
+
+      Commands.either((Commands.defer(
+        () -> drivebase.isOnLeft().getAsBoolean() ? RleftTOAutoPath() : RrightTOAutoPath(),
+        Set.of(drivebase))
+      ),     (Commands.defer(
+        () -> drivebase.isOnLeft().getAsBoolean() ? BrightTOAutoPath() : BleftTOAutoPath(),
+        Set.of(drivebase))
+      ), () -> drivebase.nonS_getIsRedAlliance()),
+
+
+      Commands.either((Commands.defer(
+        () -> drivebase.isOnLeft().getAsBoolean() ? RleftfixedGetNotes() : RrightfixedGetNotes(),
+        Set.of(drivebase))
+      ),     (Commands.defer(
+        () -> drivebase.isOnLeft().getAsBoolean() ? BrightfixedGetNotes() : BleftfixedGetNotes(),
+        Set.of(drivebase))
+      ), () -> drivebase.nonS_getIsRedAlliance()),
+
+
+      Commands.either(Commands.defer(
+        () -> drivebase.isOnLeft().getAsBoolean() ? RleftbackAutoPath() : RrightbackAutoPath(),
+        Set.of(drivebase)
+      ),     Commands.defer(
+        () -> drivebase.isOnLeft().getAsBoolean() ? BrightbackAutoPath() : BleftbackAutoPath(),
+        Set.of(drivebase)
+      ), () -> drivebase.nonS_getIsRedAlliance())
+    );
+    
   }
+
+
+  // {
+  //   // Pass in the selected auto from the SmartDashboard as our desired autnomous commmand 
+  //   return autoChooser.getSelected();
+  // }
 
   public void setMotorBrake(boolean brake)
   {
