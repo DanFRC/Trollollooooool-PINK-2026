@@ -4,64 +4,111 @@
 
 package frc.robot.subsystems.shooter;
 
+import com.ctre.phoenix.motorcontrol.ControlMode;
+import com.ctre.phoenix.motorcontrol.can.VictorSPX;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DrivebaseConstants;
 
-import com.ctre.phoenix.motorcontrol.ControlMode;
-import com.ctre.phoenix.motorcontrol.can.VictorSPX;
-
 public class ClimberSubsystem extends SubsystemBase {
+  private static final int CLIMBER_MOTOR_ID = 15;
 
-  private VictorSPX climbermotor = new VictorSPX(15);
-  private Encoder quadraturePositionEncoder = new Encoder(8, 9);
+  private static final int ENCODER_CHANNEL_A = 8;
+  private static final int ENCODER_CHANNEL_B = 9;
 
-  private double maxPosition = DrivebaseConstants.climberMaxPosition;
-  private double minPosition = DrivebaseConstants.climberMinPosition;
+  private static final double MAX_POSITION =
+      DrivebaseConstants.climberMaxPosition;
+
+  private static final double MIN_POSITION =
+      DrivebaseConstants.climberMinPosition;
+
+  private static final double SLOW_ZONE_PERCENT = 0.10;
+  private static final double SLOW_SPEED_MULTIPLIER = 0.5;
+
+  // Publish telemetry every 100 ms instead of every 20 ms.
+  private static final int TELEMETRY_PERIOD_LOOPS = 5;
+
+  private final VictorSPX climberMotor =
+      new VictorSPX(CLIMBER_MOTOR_ID);
+
+  private final Encoder positionEncoder =
+      new Encoder(
+          ENCODER_CHANNEL_A,
+          ENCODER_CHANNEL_B);
+
+  private int telemetryCounter;
 
   public ClimberSubsystem() {
-    // To run once on deploy or initialisation
-    quadraturePositionEncoder.reset();
-  }
-
-  public Command exampleMethodCommand() {
-    return runOnce(
-        () -> {
-          /* one-time action goes here */
-        });
-  }
-
-  public boolean exampleCondition() {
-    return false;
+    positionEncoder.reset();
   }
 
   @Override
   public void periodic() {
-    // Start Watching Encoder -- To add telemetry data later on
-    SmartDashboard.putNumber("Climber Encoder Raw Position", quadraturePositionEncoder.get());
+    telemetryCounter++;
+
+    if (telemetryCounter >= TELEMETRY_PERIOD_LOOPS) {
+      telemetryCounter = 0;
+
+      SmartDashboard.putNumber(
+          "Climber/Encoder Position",
+          getPosition());
+    }
   }
 
-  // Monitor encoder positions and ensure the climber does not go past certain ranges.
-  // Due to the nature of a quadrature encoder, the position of the climber has to be predetermined.
+  public void runMotor(double requestedOutput) {
+    double output =
+        MathUtil.clamp(requestedOutput, -1.0, 1.0);
 
-  // maybe add a slow down for when the climber is close to it's min max values, but this migt not work too well because less voltage = less pulling power
-  // alternatively, monitor voltage drops, so increase power under tension within the min-max values, and under freeload
-  public void runMotor(double output) {
-    if (quadraturePositionEncoder.get() > minPosition || quadraturePositionEncoder.get() < maxPosition) {
-    // Slow down the motors when near min-max values within +- 10%
-    if (maxPosition-quadraturePositionEncoder.get() >= maxPosition) {
-      // Half speed
-      climbermotor.set(ControlMode.PercentOutput, output*0.5);
-    } else {
-      // Normal speeds within values
-      climbermotor.set(ControlMode.PercentOutput, output);
-    }
-    }
-    } 
+    double position = getPosition();
 
-  @Override
-  public void simulationPeriodic() {
+    /*
+     * Positive output is assumed to increase the encoder.
+     * Negative output is assumed to decrease the encoder.
+     */
+    if (output > 0.0 && position >= MAX_POSITION) {
+      stopMotor();
+      return;
+    }
+
+    if (output < 0.0 && position <= MIN_POSITION) {
+      stopMotor();
+      return;
+    }
+
+    double slowZone =
+        (MAX_POSITION - MIN_POSITION)
+            * SLOW_ZONE_PERCENT;
+
+    boolean approachingMaximum =
+        output > 0.0
+            && position >= MAX_POSITION - slowZone;
+
+    boolean approachingMinimum =
+        output < 0.0
+            && position <= MIN_POSITION + slowZone;
+
+    if (approachingMaximum || approachingMinimum) {
+      output *= SLOW_SPEED_MULTIPLIER;
+    }
+
+    climberMotor.set(
+        ControlMode.PercentOutput,
+        output);
+  }
+
+  public void stopMotor() {
+    climberMotor.set(
+        ControlMode.PercentOutput,
+        0.0);
+  }
+
+  public double getPosition() {
+    return positionEncoder.get();
+  }
+
+  public void resetEncoder() {
+    positionEncoder.reset();
   }
 }

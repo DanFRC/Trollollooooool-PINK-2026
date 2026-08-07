@@ -3,19 +3,13 @@
 // the WPILib BSD license file in the root directory of this project.
 
 package frc.robot.subsystems.intake;
-
-import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.wpilibj.DutyCycleEncoder;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.Constants;
 
 import com.ctre.phoenix.motorcontrol.ControlMode;
-import com.ctre.phoenix.motorcontrol.can.TalonSRX;
 import com.ctre.phoenix.motorcontrol.can.VictorSPX;
 
-public class intack extends SubsystemBase {
+public class IntakeSubsystem extends SubsystemBase {
 
   private VictorSPX intakeMotor = new VictorSPX(16);
 
@@ -26,7 +20,7 @@ public class intack extends SubsystemBase {
 //   private DutyCycleEncoder backLeftEncoder = new DutyCycleEncoder(3);
 // private DutyCycleEncoder backRightEncoder = new DutyCycleEncoder(4);
   /** Creates a new ExampleSubsystem. */
-  public intack() {
+  public IntakeSubsystem() {
     intakeMotor.setInverted(true);
   }
 

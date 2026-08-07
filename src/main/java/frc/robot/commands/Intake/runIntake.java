@@ -4,21 +4,20 @@
 
 package frc.robot.commands.Intake;
 
-import frc.robot.subsystems.intake.intack;
+import frc.robot.subsystems.intake.IntakeSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 
 /** An example command that uses an example subsystem. */
 public class runIntake extends Command {
   @SuppressWarnings("PMD.UnusedPrivateField")
-  private final intack intakesyb;
+  private final IntakeSubsystem intakesyb;
 
   /**
    * Creates a new ExampleCommand.
    *
    * @param subsystem The subsystem used by this command.
    */
-  public runIntake(intack subsystem) {
+  public runIntake(IntakeSubsystem subsystem) {
     intakesyb = subsystem;
 
     addRequirements(subsystem);

@@ -4,15 +4,14 @@
 
 package frc.robot.commands.shooter;
 
-import frc.robot.subsystems.shooter.IntakeSubsystem;
-import frc.robot.subsystems.shooter.ShooterSubsystem;
+import frc.robot.subsystems.shooter.IndexerSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 
 /** An example command that uses an example subsystem. */
 public class runIntake extends Command {
   @SuppressWarnings("PMD.UnusedPrivateField")
-  private final IntakeSubsystem intakesyb;
+  private final IndexerSubsystem intakesyb;
   private final CommandXboxController pecentaga;
 
   /**
@@ -20,7 +19,7 @@ public class runIntake extends Command {
    *
    * @param subsystem The subsystem used by this command.
    */
-  public runIntake(IntakeSubsystem subsystem, CommandXboxController percentag) {
+  public runIntake(IndexerSubsystem subsystem, CommandXboxController percentag) {
     intakesyb = subsystem;
     pecentaga = percentag;
 
