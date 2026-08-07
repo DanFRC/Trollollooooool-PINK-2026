@@ -32,11 +32,21 @@ public final class Constants
 //    public static final PIDConstants ANGLE_PID       = new PIDConstants(0.4, 0, 0.01);
 //  }
 
+  public static final class FieldConstants {
+    public static final double gravity = 9.81;
+    public static final double v_maxx=0; //to be experimentally determined
+    public static final double v_maxy=0; //to be experimentally determined
+  }
+
   public static final class DrivebaseConstants
   {
 
     // Hold time on motor brakes when disabled
     public static final double WHEEL_LOCK_TIME = 10; // seconds
+
+    // Min-Max values used in the climber subsystem.
+    public static final double climberMaxPosition = 4000;
+    public static final double climberMinPosition = -800;
   }
 
   public static class OperatorConstants

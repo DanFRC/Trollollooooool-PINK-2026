@@ -24,9 +24,17 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.OperatorConstants;
+import frc.robot.commands.shooter.runClimber;
+import frc.robot.commands.shooter.runIntake;
+import frc.robot.commands.shooter.runShooter;
+import frc.robot.subsystems.shooter.ClimberSubsystem;
+import frc.robot.subsystems.shooter.IntakeSubsystem;
+import frc.robot.subsystems.shooter.ShooterSubsystem;
 import frc.robot.subsystems.swervedrive.SwerveSubsystem;
 import java.io.File;
 import java.util.Set;
+
+import frc.robot.subsystems.intake.intack;
 
 import swervelib.SwerveInputStream;
 
@@ -43,6 +51,11 @@ public class RobotContainer
   // The robot's subsystems and commands are defined here...
   private final SwerveSubsystem       drivebase  = new SwerveSubsystem(new File(Filesystem.getDeployDirectory(),
                                                                                 "swerve"));
+
+  private final ShooterSubsystem shooterSubsystem = new ShooterSubsystem();
+  private final IntakeSubsystem intakeSubsystem = new IntakeSubsystem();
+  private final ClimberSubsystem climberSubsystem = new ClimberSubsystem();
+  private final intack ballsintaker = new intack();
 
   // Establish a Sendable Chooser that will be able to be sent to the SmartDashboard, allowing selection of desired auto
   private final SendableChooser<Command> autoChooser;
@@ -100,103 +113,103 @@ public class RobotContainer
                                                                                .translationHeadingOffset(Rotation2d.fromDegrees(
                                                                                    0));
 
-private Command RleftTOAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(13.8, 0.6), Rotation2d.fromDegrees(0)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(10.5, 0.6), Rotation2d.fromDegrees(0))));
-}
+// private Command RleftTOAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(13.8, 0.6), Rotation2d.fromDegrees(0)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(10.5, 0.6), Rotation2d.fromDegrees(0))));
+// }
 
-private Command RrightTOAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(13.8, 7.5), Rotation2d.fromDegrees(180)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(10.5, 7.5), Rotation2d.fromDegrees(180))));
-}
+// private Command RrightTOAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(13.8, 7.5), Rotation2d.fromDegrees(180)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(10.5, 7.5), Rotation2d.fromDegrees(180))));
+// }
 
-private Command RleftbackAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(10.5, 0.6), Rotation2d.fromDegrees(180)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(13.8, 0.6), Rotation2d.fromDegrees(180))));
-}
+// private Command RleftbackAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(10.5, 0.6), Rotation2d.fromDegrees(180)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(13.8, 0.6), Rotation2d.fromDegrees(180))));
+// }
 
-private Command RrightbackAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(10.5, 7.5), Rotation2d.fromDegrees(180)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(13.8, 7.5), Rotation2d.fromDegrees(180))));
-}
+// private Command RrightbackAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(10.5, 7.5), Rotation2d.fromDegrees(180)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(13.8, 7.5), Rotation2d.fromDegrees(180))));
+// }
 
-private Command BleftTOAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(3.3, 7.5), Rotation2d.fromDegrees(180)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(5.7, 7.5), Rotation2d.fromDegrees(180))));
-}
+// private Command BleftTOAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(3.3, 7.5), Rotation2d.fromDegrees(180)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(5.7, 7.5), Rotation2d.fromDegrees(180))));
+// }
 
-private Command BrightTOAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(3.3, .65), Rotation2d.fromDegrees(0)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(5.7, 0.65), Rotation2d.fromDegrees(0))));
-}
+// private Command BrightTOAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(3.3, .65), Rotation2d.fromDegrees(0)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(5.7, 0.65), Rotation2d.fromDegrees(0))));
+// }
 
-private Command BleftbackAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(5.7, 7.5), Rotation2d.fromDegrees(0)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(3.3, 7.5), Rotation2d.fromDegrees(0))));
-}
+// private Command BleftbackAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(5.7, 7.5), Rotation2d.fromDegrees(0)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(3.3, 7.5), Rotation2d.fromDegrees(0))));
+// }
 
-private Command BrightbackAutoPath() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(5.7, 0.65), Rotation2d.fromDegrees(0)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(3.3, 0.65), Rotation2d.fromDegrees(0))));
-}
+// private Command BrightbackAutoPath() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(5.7, 0.65), Rotation2d.fromDegrees(0)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(3.3, 0.65), Rotation2d.fromDegrees(0))));
+// }
 
-// Auto Commands
+// // Auto Commands
 
-private Command RleftfixedGetNotes() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(8.6, 1.2), Rotation2d.fromDegrees(-23.5)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(-23.5))));
-}
+// private Command RleftfixedGetNotes() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(8.6, 1.2), Rotation2d.fromDegrees(-23.5)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(-23.5))));
+// }
 
-private Command RrightfixedGetNotes() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(-155.0)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(8.6, 1.2), Rotation2d.fromDegrees(-155.0))));
-}
+// private Command RrightfixedGetNotes() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(-155.0)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(8.6, 1.2), Rotation2d.fromDegrees(-155.0))));
+// }
 
-private Command BleftfixedGetNotes() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(8.0, 7.0), Rotation2d.fromDegrees(155.0)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(8.0, 1.2), Rotation2d.fromDegrees(155.0))));
-}
+// private Command BleftfixedGetNotes() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(8.0, 7.0), Rotation2d.fromDegrees(155.0)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(8.0, 1.2), Rotation2d.fromDegrees(155.0))));
+// }
 
-private Command BrightfixedGetNotes() {
-    return drivebase.driveToPose(
-        new Pose2d(new Translation2d(8.0, 1.2), Rotation2d.fromDegrees(23.5)))
-        .andThen(
-            drivebase.driveToPose(
-                new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(23.5))));
-}
+// private Command BrightfixedGetNotes() {
+//     return drivebase.driveToPose(
+//         new Pose2d(new Translation2d(8.0, 1.2), Rotation2d.fromDegrees(23.5)))
+//         .andThen(
+//             drivebase.driveToPose(
+//                 new Pose2d(new Translation2d(8.6, 7.0), Rotation2d.fromDegrees(23.5))));
+// }
                                                                                    
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -234,6 +247,17 @@ private Command BrightfixedGetNotes() {
   private void configureBindings()
   {
 
+    driverXbox.rightTrigger(0.01).whileTrue(new runShooter(shooterSubsystem, driverXbox));
+
+    driverXbox.leftTrigger(0.01).whileTrue(new runIntake(intakeSubsystem, driverXbox));
+
+    driverXbox.povUp().whileTrue(new runClimber(climberSubsystem, 1));
+    driverXbox.povDown().whileTrue(new runClimber(climberSubsystem, -1));
+
+    driverXbox.x().whileTrue(new frc.robot.commands.Intake.runIntake(ballsintaker));
+
+    driverXbox.y().onTrue(Commands.runOnce(() -> shooterSubsystem.increasePowerby(0.1)));
+    driverXbox.a().onTrue(Commands.runOnce(() -> shooterSubsystem.increasePowerby(-0.1)));
     
     Command driveFieldOrientedDirectAngle      = drivebase.driveFieldOriented(driveDirectAngle);
     Command driveFieldOrientedAnglularVelocity = drivebase.driveFieldOriented(driveAngularVelocity);
@@ -274,28 +298,6 @@ private Command BrightfixedGetNotes() {
       driverXbox.button(2).whileTrue(Commands.runEnd(() -> driveDirectAngleKeyboard.driveToPoseEnabled(true),
                                                      () -> driveDirectAngleKeyboard.driveToPoseEnabled(false)));
 
-
-
-     driverXbox.rightTrigger().whileTrue(
-          Commands.either(Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? RleftbackAutoPath() : RrightbackAutoPath(),
-        Set.of(drivebase)
-      ),     Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? BrightbackAutoPath() : BleftbackAutoPath(),
-        Set.of(drivebase)
-      ), () -> drivebase.nonS_getIsRedAlliance())
-     );
-
-     driverXbox.leftTrigger().whileTrue(
-          Commands.either((Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? RleftTOAutoPath() : RrightTOAutoPath(),
-        Set.of(drivebase))
-      ),     (Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? BrightTOAutoPath() : BleftTOAutoPath(),
-        Set.of(drivebase))
-      ), () -> drivebase.nonS_getIsRedAlliance())
-     );
-
     }
 
     if (DriverStation.isTest())
@@ -325,34 +327,35 @@ private Command BrightfixedGetNotes() {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    return new SequentialCommandGroup(
+    return null;
+    // return new SequentialCommandGroup(
 
-      Commands.either((Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? RleftTOAutoPath() : RrightTOAutoPath(),
-        Set.of(drivebase))
-      ),     (Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? BrightTOAutoPath() : BleftTOAutoPath(),
-        Set.of(drivebase))
-      ), () -> drivebase.nonS_getIsRedAlliance()),
-
-
-      Commands.either((Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? RleftfixedGetNotes() : RrightfixedGetNotes(),
-        Set.of(drivebase))
-      ),     (Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? BrightfixedGetNotes() : BleftfixedGetNotes(),
-        Set.of(drivebase))
-      ), () -> drivebase.nonS_getIsRedAlliance()),
+    //   Commands.either((Commands.defer(
+    //     () -> drivebase.isOnLeft().getAsBoolean() ? RleftTOAutoPath() : RrightTOAutoPath(),
+    //     Set.of(drivebase))
+    //   ),     (Commands.defer(
+    //     () -> drivebase.isOnLeft().getAsBoolean() ? BrightTOAutoPath() : BleftTOAutoPath(),
+    //     Set.of(drivebase))
+    //   ), () -> drivebase.nonS_getIsRedAlliance()),
 
 
-      Commands.either(Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? RleftbackAutoPath() : RrightbackAutoPath(),
-        Set.of(drivebase)
-      ),     Commands.defer(
-        () -> drivebase.isOnLeft().getAsBoolean() ? BrightbackAutoPath() : BleftbackAutoPath(),
-        Set.of(drivebase)
-      ), () -> drivebase.nonS_getIsRedAlliance())
-    );
+    //   Commands.either((Commands.defer(
+    //     () -> drivebase.isOnLeft().getAsBoolean() ? RleftfixedGetNotes() : RrightfixedGetNotes(),
+    //     Set.of(drivebase))
+    //   ),     (Commands.defer(
+    //     () -> drivebase.isOnLeft().getAsBoolean() ? BrightfixedGetNotes() : BleftfixedGetNotes(),
+    //     Set.of(drivebase))
+    //   ), () -> drivebase.nonS_getIsRedAlliance()),
+
+
+    //   Commands.either(Commands.defer(
+    //     () -> drivebase.isOnLeft().getAsBoolean() ? RleftbackAutoPath() : RrightbackAutoPath(),
+    //     Set.of(drivebase)
+    //   ),     Commands.defer(
+    //     () -> drivebase.isOnLeft().getAsBoolean() ? BrightbackAutoPath() : BleftbackAutoPath(),
+    //     Set.of(drivebase)
+    //   ), () -> drivebase.nonS_getIsRedAlliance())
+    // );
     
   }
 
