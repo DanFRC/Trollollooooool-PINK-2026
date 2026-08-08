@@ -15,8 +15,10 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.subsystems.intake.IntakeSubsystem;
 import frc.robot.subsystems.shooter.ClimberSubsystem;
+import frc.robot.subsystems.shooter.ConveyorSubsystem;
 import frc.robot.subsystems.shooter.IndexerSubsystem;
 import frc.robot.subsystems.shooter.ShooterSubsystem;
+import frc.robot.subsystems.shooter.TheStickSubsystem;
 import frc.robot.subsystems.swervedrive.SwerveSubsystem;
 import java.io.File;
 import java.util.Set;
@@ -34,29 +36,34 @@ public class RobotContainer {
 
 
   // Auto setup
-  private final SendableChooser<Command> autoChooser =
-	new SendableChooser<>();
+    private final SendableChooser<Command> autoChooser =
+	    new SendableChooser<>();
 
 
-  private final CommandXboxController driverXbox =
+    private final CommandXboxController driverXbox =
       new CommandXboxController(0);
 
-  private final SwerveSubsystem drivebase =
+    private final SwerveSubsystem drivebase =
       new SwerveSubsystem(
           new File(Filesystem.getDeployDirectory(), "swerve"));
 
-  private final ShooterSubsystem shooterSubsystem =
+    private final ShooterSubsystem shooterSubsystem =
       new ShooterSubsystem();
 
-  private final IndexerSubsystem intakeSubsystem =
+    private final IndexerSubsystem intakeSubsystem =
       new IndexerSubsystem();
 
-  private final ClimberSubsystem climberSubsystem =
+    private final ClimberSubsystem climberSubsystem =
       new ClimberSubsystem();
 
-  private final IntakeSubsystem ballIntakeSubsystem =
+    private final IntakeSubsystem ballIntakeSubsystem =
       new IntakeSubsystem();
 
+    private final ConveyorSubsystem conveyorSubsystem =
+        new ConveyorSubsystem();
+
+    private final TheStickSubsystem theStickSubsystem = 
+        new TheStickSubsystem();
 
   // go to commands
   private static final double BLUE_HOME_ZONE_LIMIT = 4.5;
@@ -153,10 +160,10 @@ private Command goToClosestPosition() {
   private final SwerveInputStream fieldOrientedDrive =
       SwerveInputStream.of(
               drivebase.getSwerveDrive(),
-              () -> -driverXbox.getLeftY(),
-              () -> -driverXbox.getLeftX())
+              () -> driverXbox.getLeftY(),
+              () -> driverXbox.getLeftX())
           .withControllerRotationAxis(
-              () -> -driverXbox.getRightX())
+              () -> driverXbox.getRightX())
           .deadband(OperatorConstants.DEADBAND)
           .scaleTranslation(0.8)
           .allianceRelativeControl(true);
@@ -213,11 +220,33 @@ private Command goToClosestPosition() {
         .leftTrigger(TRIGGER_DEADBAND)
         .whileTrue(
             Commands.runEnd(
-                () ->
+                () -> {
                     intakeSubsystem.runMotor(
-                        driverXbox.getLeftTriggerAxis()),
-                () -> intakeSubsystem.runMotor(0.0),
+                        driverXbox.getLeftTriggerAxis());
+                    conveyorSubsystem.runMotor(
+                        driverXbox.getLeftTriggerAxis());
+                },
+                () -> {
+                    intakeSubsystem.runMotor(0.0);
+                    conveyorSubsystem.runMotor(0.0);
+                },
                 intakeSubsystem));
+
+    driverXbox
+        .button(6)
+        .whileTrue(
+            Commands.runOnce(
+                () -> drivebase.zeroGyro()
+            )
+        );
+
+    driverXbox
+        .button(5)
+        .whileTrue(
+            Commands.runOnce(
+                () -> theStickSubsystem.dotheThing("6")
+            )
+        );
 
     /*
      * Climber
