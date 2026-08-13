@@ -3,78 +3,63 @@
 // the WPILib BSD license file in the root directory of this project.
 
 package frc.robot.subsystems.intake;
-import edu.wpi.first.wpilibj.Servo;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.VictorSPX;
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.wpilibj.Servo;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 public class IntakeSubsystem extends SubsystemBase {
+	private static final int INTAKE_MOTOR_ID = 16;
+	private static final int SERVO_PORT = 0;
 
-  private VictorSPX intakeMotor = new VictorSPX(16);
-  private Servo servo = new Servo(0);
-  private static double SERVO_START_POINT = 1;
-  private static double SERVO_OPEN_POINT = 0.5;
+	private static final double SERVO_CLOSED_POSITION = 1.0;
+	private static final double SERVO_OPEN_POSITION = 0.5;
 
+	private final VictorSPX intakeMotor =
+		new VictorSPX(INTAKE_MOTOR_ID);
 
-  // testing purposes dw
-//     private DutyCycleEncoder frontLeftEncoder = new DutyCycleEncoder(2);
-// private DutyCycleEncoder frontRightEncoder = new DutyCycleEncoder(1);
-//   private DutyCycleEncoder backLeftEncoder = new DutyCycleEncoder(3);
-// private DutyCycleEncoder backRightEncoder = new DutyCycleEncoder(4);
-  /** Creates a new ExampleSubsystem. */
-  public IntakeSubsystem() {
-    intakeMotor.setInverted(true);
+	private final Servo intakeServo =
+		new Servo(SERVO_PORT);
 
-    servo.set(SERVO_START_POINT);
-  }
+	public IntakeSubsystem() {
+		intakeMotor.setInverted(true);
 
-  /**
-   * Example command factory method.
-   *
-   * @return a command
-   */
-  public Command exampleMethodCommand() {
-    // Inline construction of command goes here.
-    // Subsystem::RunOnce implicitly requires `this` subsystem.
-    return runOnce(
-        () -> {
-          /* one-time action goes here */
-        });
-  }
+		// make sure intake starts closed
+		closeServo();
+	}
 
-  public boolean exampleCondition() {
-    // Query some boolean state, such as a digital sensor.
-    return false;
-  }
+	public void runMotor(double output) {
+		intakeMotor.set(
+			ControlMode.PercentOutput,
+			MathUtil.clamp(output, -1.0, 1.0));
+	}
 
-  @Override
-  public void periodic() {
-    // testing purposes dw
-    //     SmartDashboard.putNumber("encoderFR", frontRightEncoder.get());
-    // SmartDashboard.putNumber("encoderFL", frontLeftEncoder.get());
-    // SmartDashboard.putNumber("encoderBL", backLeftEncoder.get());
-    // SmartDashboard.putNumber("encoderBR", backRightEncoder.get());
+	public void stopMotor() {
+		intakeMotor.set(
+			ControlMode.PercentOutput,
+			0.0);
+	}
 
-    // This method will be called once per scheduler run
-    
-  }
+	public void openServo() {
+		intakeServo.set(
+			SERVO_OPEN_POSITION);
+	}
 
-  public void openServo() {
-    servo.set(SERVO_OPEN_POINT);
-  }
+	public void closeServo() {
+		intakeServo.set(
+			SERVO_CLOSED_POSITION);
+	}
 
-  public void closeServo() {
-    servo.set(SERVO_START_POINT);
-  }
+	public boolean isServoOpen() {
+		return Math.abs(
+			intakeServo.get()
+				- SERVO_OPEN_POSITION)
+					< 0.05;
+	}
 
-  public void runMotor(double output) {
-    intakeMotor.set(ControlMode.PercentOutput, output);
-  }
-
-  @Override
-  public void simulationPeriodic() {
-    // This method will be called once per scheduler run during simulation
-  }
+	public double getServoPosition() {
+		return intakeServo.get();
+	}
 }
