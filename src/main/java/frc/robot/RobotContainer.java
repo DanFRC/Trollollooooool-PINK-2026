@@ -648,18 +648,6 @@ private void configureAutoSelector() {
 		"Aim And Shoot",
 		createAimAndShootAuto());
 
-	autoChooser.addOption(
-		"Start Anywhere - New Path Only",
-		drivebase.pathfindThenFollowPath(
-			"New Path"));
-
-	autoChooser.addOption(
-		"Start Anywhere - New Path + Shoot",
-		Commands.sequence(
-			drivebase.pathfindThenFollowPath(
-				"New Path"),
-			createAimAndShootAuto()));
-
 	SmartDashboard.putData(
 		"Autonomous Selector",
 		autoChooser);
