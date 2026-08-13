@@ -35,7 +35,7 @@ public class AimAtHopper extends Command {
 
 	// rough speed of the fuel after leaving the shooter
 	private static final double SHOT_SPEED_METERS_PER_SECOND =
-		8.0;
+		0.05;
 
 	// change to 180 if we goin backwards yo
 	private static final double SHOOTER_DIRECTION_OFFSET_DEGREES =

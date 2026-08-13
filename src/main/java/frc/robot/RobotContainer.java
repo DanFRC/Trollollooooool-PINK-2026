@@ -297,8 +297,7 @@ private Command goToClosestPosition() {
 private void startAutoIntake() {
 	ballIntakeSubsystem.openServo();
 	ballIntakeSubsystem.runMotor(BALL_INTAKE_POWER);
-	intakeSubsystem.runMotor(1.0);
-	conveyorSubsystem.runMotor(1.0);
+	conveyorSubsystem.runMotor(0.3);
 
 	theStickSubsystem.setIntaking(true);
 	theStickSubsystem.setIndexing(true);
@@ -306,7 +305,6 @@ private void startAutoIntake() {
 
 private void stopAutoIntake() {
 	ballIntakeSubsystem.stopMotor();
-	intakeSubsystem.runMotor(0.0);
 	conveyorSubsystem.runMotor(0.0);
 
 	theStickSubsystem.setIntaking(false);
@@ -317,18 +315,12 @@ private void configurePathPlannerEvents() {
 	new EventTrigger("START_INTAKE")
 		.onTrue(
 			Commands.runOnce(
-				this::startAutoIntake,
-				ballIntakeSubsystem,
-				intakeSubsystem,
-				conveyorSubsystem));
+				this::startAutoIntake));
 
 	new EventTrigger("STOP_INTAKE")
 		.onTrue(
 			Commands.runOnce(
-				this::stopAutoIntake,
-				ballIntakeSubsystem,
-				intakeSubsystem,
-				conveyorSubsystem));
+				this::stopAutoIntake));
 }
 
 private void configureBindings() {
@@ -576,6 +568,12 @@ private boolean isAutoReadyToShoot(AimAtHopper autoAim) {
 }
 
 private Command createAimAndShootAuto() {
+	return createAimAndShootAuto(
+		AUTO_FEED_TIME);
+}
+
+private Command createAimAndShootAuto(
+	double feedTimeSeconds) {
 	AimAtHopper autoAim =
 		new AimAtHopper(
 			drivebase,
@@ -584,7 +582,7 @@ private Command createAimAndShootAuto() {
 
 	Command shakeIntake =
 		Commands.sequence(
-			// shake the fuel loose
+			// shake the intake loose
 			intakeShimmy(
 				INTAKE_SHIMMY_SPEED),
 
@@ -637,7 +635,7 @@ private Command createAimAndShootAuto() {
 			intakeSubsystem,
 			conveyorSubsystem)
 				.withTimeout(
-					AUTO_FEED_TIME);
+					feedTimeSeconds);
 
 	Command waitUntilReady =
 		Commands.waitUntil(
@@ -711,6 +709,9 @@ private void configureAutoSelector() {
 			// start wherever vision says we are
 			drivebase.pathfindThenFollowPath(
 				"GO_FRONT_HOPPER"),
+
+			// shoot the preload before leaving the hopper
+			createAimAndShootAuto(1.5),
 
 			// grab balls then return to our zone
 			drivebase.followPath(
