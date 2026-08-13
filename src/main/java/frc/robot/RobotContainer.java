@@ -272,7 +272,18 @@ private Command goToClosestPosition() {
     DriverStation.silenceJoystickConnectionWarning(true);
 
     drivebase.setDefaultCommand(
-        drivebase.driveFieldOriented(fieldOrientedDrive));
+		Commands.run(
+			() -> {
+				if (DriverStation.isTeleopEnabled()) {
+					drivebase.driveFieldOriented(
+						fieldOrientedDrive.get());
+				} else {
+					// dont let the sticks drive after auto finishes
+					drivebase.drive(
+						new ChassisSpeeds());
+				}
+			},
+			drivebase));
 
     configureBindings();
 
@@ -280,10 +291,15 @@ private Command goToClosestPosition() {
   }
 
 private void configureBindings() {
+	Trigger teleopEnabled =
+		new Trigger(
+			DriverStation::isTeleopEnabled);
+
 	// aim at hub and shoot
     Trigger rightTrigger =
         driverXbox.rightTrigger(
-            TRIGGER_DEADBAND);
+            TRIGGER_DEADBAND)
+				.and(teleopEnabled);
 
     Trigger shuttleZone =
         new Trigger(
@@ -396,6 +412,7 @@ private void configureBindings() {
 	// increase shooter setting
 	driverXbox
 		.y()
+		.and(teleopEnabled)
 		.onTrue(
 			Commands.runOnce(
 				() ->
@@ -405,6 +422,7 @@ private void configureBindings() {
 	// decrease shooter setting
 	driverXbox
 		.a()
+		.and(teleopEnabled)
 		.onTrue(
 			Commands.runOnce(
 				() ->
@@ -414,6 +432,7 @@ private void configureBindings() {
 	// run indexer and conveyor
 	driverXbox
 		.leftTrigger(TRIGGER_DEADBAND)
+		.and(teleopEnabled)
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
@@ -440,6 +459,7 @@ private void configureBindings() {
 	// climber down
 	driverXbox
 		.povDown()
+		.and(teleopEnabled)
 		.whileTrue(
 			Commands.runEnd(
 				() ->
@@ -450,6 +470,7 @@ private void configureBindings() {
 	// climber up
 	driverXbox
 		.povUp()
+		.and(teleopEnabled)
 		.whileTrue(
 			Commands.runEnd(
 				() ->
@@ -460,6 +481,7 @@ private void configureBindings() {
 	// run the big ball intake
 	driverXbox
 		.x()
+		.and(teleopEnabled)
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
@@ -480,6 +502,7 @@ private void configureBindings() {
 	// reset field direction
 	driverXbox
 		.start()
+		.and(teleopEnabled)
 		.onTrue(
 			Commands.runOnce(
 				drivebase::zeroGyro,
@@ -488,6 +511,7 @@ private void configureBindings() {
 	// lock the wheels
 	driverXbox
 		.leftBumper()
+		.and(teleopEnabled)
 		.whileTrue(
 			Commands.run(
 				drivebase::lock,
@@ -496,8 +520,18 @@ private void configureBindings() {
 	// go to closest shooting position
 	driverXbox
 		.rightBumper()
+		.and(teleopEnabled)
 		.whileTrue(
 			goToClosestPosition());
+}
+
+private boolean isAutoReadyToShoot(AimAtHopper autoAim) {
+	boolean shooterReady =
+		RobotBase.isSimulation()
+			|| shooterSubsystem.isAtTargetRPM();
+
+	return shooterReady
+		&& autoAim.isAimed();
 }
 
 private Command createAimAndShootAuto() {
@@ -567,8 +601,7 @@ private Command createAimAndShootAuto() {
 	Command waitUntilReady =
 		Commands.waitUntil(
 			() ->
-				shooterSubsystem.isAtTargetRPM()
-					&& autoAim.isAimed())
+				isAutoReadyToShoot(autoAim))
 						.withTimeout(
 							AUTO_SHOOT_TIMEOUT);
 
@@ -592,9 +625,7 @@ private Command createAimAndShootAuto() {
 						feedBalls,
 						Commands.none(),
 						() ->
-							shooterSubsystem
-								.isAtTargetRPM()
-								&& autoAim.isAimed())),
+							isAutoReadyToShoot(autoAim))),
 
 				autoAim,
 				spinUpShooter));
