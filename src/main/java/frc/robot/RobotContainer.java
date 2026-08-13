@@ -7,12 +7,14 @@ package frc.robot;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.subsystems.intake.IntakeSubsystem;
 import frc.robot.subsystems.shooter.ClimberSubsystem;
@@ -34,9 +36,63 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class RobotContainer {
-  private static final double TRIGGER_DEADBAND = 0.01;
-  private static final double SHOOTER_POWER_STEP = 0.01;
-  private static final double BALL_INTAKE_POWER = 0.8;
+    private static final double TRIGGER_DEADBAND = 0.01;
+    private static final double SHOOTER_POWER_STEP = 0.01;
+    private static final double BALL_INTAKE_POWER = 0.8;
+
+    private static final double AUTO_SHOOT_TIMEOUT = 4.0;
+    private static final double AUTO_FEED_TIME = 2.0;
+    private static final double AUTO_FEED_POWER = 1.0;
+
+    private static final double INTAKE_SHIMMY_SPEED = 0.6;
+    private static final double INTAKE_SHIMMY_TIME = 0.15;
+
+    // Aimer stuff
+    private static final double SHUTTLE_ZONE_MIN_X = 5.0;
+    private static final double SHUTTLE_ZONE_MAX_X = 11.5;
+
+    private static final double BLUE_SHUTTLE_X = 3.2;
+    private static final double RED_SHUTTLE_X = 13.25;
+
+    private static final double LOWER_SHUTTLE_Y = 1.65;
+    private static final double UPPER_SHUTTLE_Y = 6.45;
+    private static final double FIELD_MIDDLE_Y = 4.0345;
+    // dont feed until shooter gets here
+    private static final double SHUTTLE_READY_RPM = 3000.0;
+
+    private boolean isInShuttleZone() {
+        double robotX =
+            drivebase.getPose().getX();
+
+        return robotX >= SHUTTLE_ZONE_MIN_X
+            && robotX <= SHUTTLE_ZONE_MAX_X;
+    }
+
+    private Translation2d getAllianceShuttleTarget() {
+        Pose2d robotPose =
+            drivebase.getPose();
+
+        boolean isRed =
+            DriverStation
+                .getAlliance()
+                .orElse(Alliance.Blue)
+                    == Alliance.Red;
+
+        double targetX =
+            isRed
+                ? RED_SHUTTLE_X
+                : BLUE_SHUTTLE_X;
+
+        // aim at the side were already closest to
+        double targetY =
+            robotPose.getY() >= FIELD_MIDDLE_Y
+                ? UPPER_SHUTTLE_Y
+                : LOWER_SHUTTLE_Y;
+
+        return new Translation2d(
+            targetX,
+            targetY);
+    }
 
     // Odometry stuff
     private Translation2d getAllianceHub() {
@@ -61,6 +117,23 @@ public class RobotContainer {
 
 
   // Auto setup
+
+    private Command intakeShimmy(double sidewaysSpeed) {
+	return Commands.runEnd(
+		() ->
+			drivebase.drive(
+				new ChassisSpeeds(
+					0.0,
+					sidewaysSpeed,
+					0.0)),
+		() ->
+			drivebase.drive(
+				new ChassisSpeeds()),
+		drivebase)
+			.withTimeout(
+				INTAKE_SHIMMY_TIME);
+    }
+
     private final SendableChooser<Command> autoChooser =
 	    new SendableChooser<>();
 
@@ -95,11 +168,11 @@ public class RobotContainer {
   private static final double BLUE_HOME_ZONE_LIMIT = 4.5;
 private static final double RED_HOME_ZONE_LIMIT = 12.0;
 
-private static final double BLUE_HOME_TARGET_X = 3.2;
+private static final double BLUE_HOME_TARGET_X = 3.3;
 private static final double BLUE_MIDDLE_TARGET_X = 6.0;
 
 private static final double RED_HOME_TARGET_X = 13.25;
-private static final double RED_MIDDLE_TARGET_X = 11.0;
+private static final double RED_MIDDLE_TARGET_X = 10.0;
 
 private Command goToClosestPosition() {
 	return Commands.defer(
@@ -136,25 +209,25 @@ private Command goToClosestPosition() {
 				firstTarget =
 					new Pose2d(
 						targetX,
-						6.5,
+						0.65,
 						Rotation2d.fromDegrees(0.0));
 
 				secondTarget =
 					new Pose2d(
 						targetX,
-						7.25,
+						7.45,
 						Rotation2d.fromDegrees(180.0));
 			} else {
 				firstTarget =
 					new Pose2d(
 						targetX,
-						7.25,
+						7.45,
 						Rotation2d.fromDegrees(0.0));
 
 				secondTarget =
 					new Pose2d(
 						targetX,
-						6.5,
+						0.65,
 						Rotation2d.fromDegrees(180.0));
 			}
 
@@ -207,31 +280,117 @@ private Command goToClosestPosition() {
 
 private void configureBindings() {
 	// aim at hub and shoot
-	driverXbox
-		.rightTrigger(TRIGGER_DEADBAND)
-		.whileTrue(
-			Commands.parallel(
-				new AimAtHopper(
-					drivebase,
-					() -> -driverXbox.getLeftY(),
-					() -> -driverXbox.getLeftX()),
+    Trigger rightTrigger =
+        driverXbox.rightTrigger(
+            TRIGGER_DEADBAND);
 
-				Commands.runEnd(
-					() -> {
-						theStickSubsystem
-							.setShooterRunning(true);
+    Trigger shuttleZone =
+        new Trigger(
+            this::isInShuttleZone);
 
-						shooterSubsystem
-							.runMotorForDistance(
-								getDistanceToHub());
-					},
-					() -> {
-						shooterSubsystem.stopMotor();
+    // normal hub shooting
+    rightTrigger
+        .and(shuttleZone.negate())
+        .whileTrue(
+            Commands.parallel(
+                new AimAtHopper(
+                    drivebase,
+                    () -> -driverXbox.getLeftY(),
+                    () -> -driverXbox.getLeftX()),
 
-						theStickSubsystem
-							.setShooterRunning(false);
-					},
-					shooterSubsystem)));
+                Commands.runEnd(
+                    () -> {
+                        theStickSubsystem
+                            .setShooterRunning(true);
+
+                        shooterSubsystem
+                            .runMotorForDistance(
+                                getDistanceToHub());
+                    },
+                    () -> {
+                        shooterSubsystem.stopMotor();
+
+                        theStickSubsystem
+                            .setShooterRunning(false);
+                    },
+                    shooterSubsystem)));
+
+    // shuttle from the middle
+    Command shuttleSpinUp =
+        Commands.runEnd(
+            () -> {
+                shooterSubsystem.runMotor(1.0);
+
+                theStickSubsystem
+                    .setShooterRunning(true);
+            },
+            () -> {
+                shooterSubsystem.stopMotor();
+
+                theStickSubsystem
+                    .setShooterRunning(false);
+            },
+            shooterSubsystem);
+
+    Command shuttleFeed =
+        Commands.runEnd(
+            () -> {
+                boolean shooterReady =
+                    Math.abs(
+                        shooterSubsystem.getRPM())
+                            >= SHUTTLE_READY_RPM;
+
+                // stop feeding if shooter slows down
+                if (shooterReady) {
+                    intakeSubsystem.runMotor(1.0);
+                    conveyorSubsystem.runMotor(1.0);
+
+                    theStickSubsystem
+                        .setIndexing(true);
+                } else {
+                    intakeSubsystem.runMotor(0.0);
+                    conveyorSubsystem.runMotor(0.0);
+
+                    theStickSubsystem
+                        .setIndexing(false);
+                }
+            },
+            () -> {
+                intakeSubsystem.runMotor(0.0);
+                conveyorSubsystem.runMotor(0.0);
+
+                theStickSubsystem
+                    .setIndexing(false);
+            },
+            intakeSubsystem,
+            conveyorSubsystem);
+
+    Command shuttleShoot =
+        Commands.deadline(
+            Commands.sequence(
+                // let shooter ramp up first
+                Commands.waitUntil(
+                    () ->
+                        Math.abs(
+                            shooterSubsystem.getRPM())
+                                >= SHUTTLE_READY_RPM),
+
+                // feed until driver releases trigger
+                shuttleFeed),
+
+            // aim and spin while we wait/feed
+            new AimAtHopper(
+                drivebase,
+                () -> -driverXbox.getLeftY(),
+                () -> -driverXbox.getLeftX(),
+                this::getAllianceShuttleTarget),
+
+            shuttleSpinUp);
+
+    rightTrigger
+        .and(shuttleZone)
+        .whileTrue(
+            shuttleShoot);
 
 	// increase shooter setting
 	driverXbox
@@ -340,14 +499,114 @@ private void configureBindings() {
 			goToClosestPosition());
 }
 
-  // Auto
-  private void configureAutoSelector() {
+private void configureAutoSelector() {
 	autoChooser.setDefaultOption(
 		"Open Intake",
-		Commands.sequence(Commands.runOnce(() -> {
-            ballIntakeSubsystem.closeServo();
-            ballIntakeSubsystem.openServo();
-        })));
+		Commands.runOnce(
+			ballIntakeSubsystem::openServo,
+			ballIntakeSubsystem));
+
+	AimAtHopper autoAim =
+		new AimAtHopper(
+			drivebase,
+			() -> 0.0,
+			() -> 0.0);
+
+	Command shakeIntake =
+		Commands.sequence(
+			// shake the fuel loose
+			intakeShimmy(
+				INTAKE_SHIMMY_SPEED),
+
+			intakeShimmy(
+				-INTAKE_SHIMMY_SPEED),
+
+			intakeShimmy(
+				INTAKE_SHIMMY_SPEED),
+
+			intakeShimmy(
+				-INTAKE_SHIMMY_SPEED));
+
+	Command spinUpShooter =
+		Commands.runEnd(
+			() -> {
+				theStickSubsystem
+					.setShooterRunning(true);
+
+				shooterSubsystem
+					.runMotorForDistance(
+						getDistanceToHub());
+			},
+			() -> {
+				shooterSubsystem.stopMotor();
+
+				theStickSubsystem
+					.setShooterRunning(false);
+			},
+			shooterSubsystem);
+
+	Command feedBalls =
+		Commands.runEnd(
+			() -> {
+				intakeSubsystem.runMotor(
+					AUTO_FEED_POWER);
+
+				conveyorSubsystem.runMotor(
+					AUTO_FEED_POWER);
+
+				theStickSubsystem
+					.setIndexing(true);
+			},
+			() -> {
+				intakeSubsystem.runMotor(0.0);
+				conveyorSubsystem.runMotor(0.0);
+
+				theStickSubsystem
+					.setIndexing(false);
+			},
+			intakeSubsystem,
+			conveyorSubsystem)
+				.withTimeout(
+					AUTO_FEED_TIME);
+
+	Command waitUntilReady =
+		Commands.waitUntil(
+			() ->
+				shooterSubsystem.isAtTargetRPM()
+					&& autoAim.isAimed())
+						.withTimeout(
+							AUTO_SHOOT_TIMEOUT);
+
+	Command aimAndShoot =
+		Commands.sequence(
+			// drop intake
+			Commands.runOnce(
+				ballIntakeSubsystem::openServo,
+				ballIntakeSubsystem),
+
+			// swerve shimmy
+			shakeIntake,
+
+			// aim and spin up at the same time
+			Commands.deadline(
+				Commands.sequence(
+					waitUntilReady,
+
+					// dont feed if we arent ready
+					Commands.either(
+						feedBalls,
+						Commands.none(),
+						() ->
+							shooterSubsystem
+								.isAtTargetRPM()
+								&& autoAim.isAimed())),
+
+				autoAim,
+				spinUpShooter));
+
+	autoChooser.addOption(
+		"lil shimmy auto",
+		aimAndShoot);
 
 	SmartDashboard.putData(
 		"Autonomous Selector",
@@ -355,17 +614,10 @@ private void configureBindings() {
 }
 
 public Command getAutonomousCommand() {
-
-
-
 	return autoChooser.getSelected();
 }
 
-  /*
-   * Robot.java uses this when switching between enabled
-   * and disabled modes.
-   */
-  public void setMotorBrake(boolean brake) {
+public void setMotorBrake(boolean brake) {
     drivebase.setMotorBrake(brake);
-  }
+}
 }

@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants;
 import frc.robot.subsystems.swervedrive.SwerveSubsystem;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 public class AimAtHopper extends Command {
 	private static final Translation2d BLUE_HOPPER =
@@ -24,32 +25,88 @@ public class AimAtHopper extends Command {
 			11.9155,
 			4.0346);
 
-	private static final double SHOOTING_SPEED_SCALE = 0.15;
+	// still drive slowly while shooting
+	private static final double SHOOTING_DRIVE_SCALE =
+		0.15;
 
-	private static final double SHOT_SPEED_METERS_PER_SECOND = 8.0;
+	// rotate at full speed so we lock on asap
+	private static final double SHOOTING_ROTATION_SCALE =
+		1.0;
 
-    // change to 180 if we goin backwarsd yo
+	// rough speed of the fuel after leaving the shooter
+	private static final double SHOT_SPEED_METERS_PER_SECOND =
+		8.0;
+
+	// change to 180 if we goin backwards yo
 	private static final double SHOOTER_DIRECTION_OFFSET_DEGREES =
 		0.0;
 
 	private final SwerveSubsystem drivebase;
+
 	private final DoubleSupplier translationXSupplier;
 	private final DoubleSupplier translationYSupplier;
 
+	private final Supplier<Translation2d> targetSupplier;
+
+	private final double driveScale;
+
 	private final PIDController rotationController =
 		new PIDController(
-			4.0,
+			7.0,
 			0.0,
-			0.15);
+			0.25);
 
+	// normal hub aiming
 	public AimAtHopper(
 		SwerveSubsystem drivebase,
 		DoubleSupplier translationXSupplier,
 		DoubleSupplier translationYSupplier) {
 
+		this(
+			drivebase,
+			translationXSupplier,
+			translationYSupplier,
+			AimAtHopper::getAllianceHub,
+			SHOOTING_DRIVE_SCALE);
+	}
+
+	// custom target but normal shooting speed
+	public AimAtHopper(
+		SwerveSubsystem drivebase,
+		DoubleSupplier translationXSupplier,
+		DoubleSupplier translationYSupplier,
+		Supplier<Translation2d> targetSupplier) {
+
+		this(
+			drivebase,
+			translationXSupplier,
+			translationYSupplier,
+			targetSupplier,
+			SHOOTING_DRIVE_SCALE);
+	}
+
+	// custom target and custom drive speed
+	public AimAtHopper(
+		SwerveSubsystem drivebase,
+		DoubleSupplier translationXSupplier,
+		DoubleSupplier translationYSupplier,
+		Supplier<Translation2d> targetSupplier,
+		double driveScale) {
+
 		this.drivebase = drivebase;
 		this.translationXSupplier = translationXSupplier;
 		this.translationYSupplier = translationYSupplier;
+
+		this.targetSupplier =
+			targetSupplier != null
+				? targetSupplier
+				: AimAtHopper::getAllianceHub;
+
+		this.driveScale =
+			MathUtil.clamp(
+				driveScale,
+				0.0,
+				1.0);
 
 		rotationController.enableContinuousInput(
 			-Math.PI,
@@ -71,66 +128,72 @@ public class AimAtHopper extends Command {
 		Pose2d robotPose =
 			drivebase.getPose();
 
+		Translation2d targetPosition =
+			targetSupplier.get();
+
 		ChassisSpeeds fieldVelocity =
 			drivebase.getFieldVelocity();
 
-		Translation2d hopperPosition =
-			getHopperPosition();
-
-		Translation2d robotToHopper =
-			hopperPosition.minus(
+		Translation2d robotToTarget =
+			targetPosition.minus(
 				robotPose.getTranslation());
 
-		double distanceMeters =
-			robotToHopper.getNorm();
+		double distanceToTarget =
+			robotToTarget.getNorm();
 
-		double flightTimeSeconds =
+		// rough guess for how long the fuel is flying
+		double flightTime =
+			distanceToTarget
+				/ SHOT_SPEED_METERS_PER_SECOND;
+
+		flightTime =
 			MathUtil.clamp(
-				distanceMeters
-					/ SHOT_SPEED_METERS_PER_SECOND,
+				flightTime,
 				0.0,
 				0.75);
 
-		Translation2d velocityOffset =
+		// fuel keeps some of the robots movement when it leaves
+		Translation2d movementOffset =
 			new Translation2d(
 				fieldVelocity.vxMetersPerSecond
-					* flightTimeSeconds,
+					* flightTime,
 				fieldVelocity.vyMetersPerSecond
-					* flightTimeSeconds);
+					* flightTime);
 
-		Translation2d compensatedAimPoint =
-			hopperPosition.minus(
-				velocityOffset);
+		// aim behind the target to cancel robot movement
+		Translation2d compensatedTarget =
+			targetPosition.minus(
+				movementOffset);
 
-		Translation2d compensatedAimVector =
-			compensatedAimPoint.minus(
+		Translation2d aimingVector =
+			compensatedTarget.minus(
 				robotPose.getTranslation());
 
-		Rotation2d targetHeading =
-			compensatedAimVector
+		Rotation2d wantedHeading =
+			aimingVector
 				.getAngle()
 				.plus(
 					Rotation2d.fromDegrees(
 						SHOOTER_DIRECTION_OFFSET_DEGREES));
 
-		double maximumAngularVelocity =
-			drivebase
-				.getSwerveDrive()
-				.getMaximumChassisAngularVelocity()
-				* SHOOTING_SPEED_SCALE;
-
-		double rotationOutput =
+		double rotationSpeed =
 			rotationController.calculate(
 				robotPose
 					.getRotation()
 					.getRadians(),
-				targetHeading.getRadians());
+				wantedHeading.getRadians());
 
-		rotationOutput =
+		double maxRotationSpeed =
+			drivebase
+				.getSwerveDrive()
+				.getMaximumChassisAngularVelocity()
+				* SHOOTING_ROTATION_SCALE;
+
+		rotationSpeed =
 			MathUtil.clamp(
-				rotationOutput,
-				-maximumAngularVelocity,
-				maximumAngularVelocity);
+				rotationSpeed,
+				-maxRotationSpeed,
+				maxRotationSpeed);
 
 		double xInput =
 			MathUtil.applyDeadband(
@@ -142,20 +205,21 @@ public class AimAtHopper extends Command {
 				translationYSupplier.getAsDouble(),
 				Constants.OperatorConstants.DEADBAND);
 
+		// keep controls alliance relative
 		if (isRedAlliance()) {
 			xInput *= -1.0;
 			yInput *= -1.0;
 		}
 
-		double maximumTranslationVelocity =
+		double maxDriveSpeed =
 			Constants.MAX_SPEED
-				* SHOOTING_SPEED_SCALE;
+				* driveScale;
 
 		drivebase.driveFieldOriented(
 			new ChassisSpeeds(
-				xInput * maximumTranslationVelocity,
-				yInput * maximumTranslationVelocity,
-				rotationOutput));
+				xInput * maxDriveSpeed,
+				yInput * maxDriveSpeed,
+				rotationSpeed));
 	}
 
 	@Override
@@ -173,13 +237,13 @@ public class AimAtHopper extends Command {
 		return rotationController.atSetpoint();
 	}
 
-	private Translation2d getHopperPosition() {
+	public static Translation2d getAllianceHub() {
 		return isRedAlliance()
 			? RED_HOPPER
 			: BLUE_HOPPER;
 	}
 
-	private boolean isRedAlliance() {
+	private static boolean isRedAlliance() {
 		return DriverStation
 			.getAlliance()
 			.orElse(Alliance.Blue)

@@ -13,6 +13,8 @@ public class TheStickSubsystem extends SubsystemBase {
 	private static final String SOLID_RED = "1";
 	private static final String SOLID_GREEN = "2";
 	private static final String GREEN_FLICKER = "g";
+    private static final String DISABLED_MODE = "3";
+    private static final String POLICE_MODE = "p";
 
 	private final BooleanSupplier shooterReady;
 
@@ -21,6 +23,7 @@ public class TheStickSubsystem extends SubsystemBase {
 	private boolean intaking = false;
 	private boolean shooterRunning = false;
 	private boolean indexing = false;
+    private boolean shuttling = false;
 
 	private String currentCommand = "";
 
@@ -36,7 +39,7 @@ public class TheStickSubsystem extends SubsystemBase {
 					9600,
 					SerialPort.Port.kUSB);
 
-			sendCommand(MIKU_MODE);
+			sendCommand(DISABLED_MODE);
 		} catch (Exception exception) {
 			theStick = null;
 
@@ -58,56 +61,100 @@ public class TheStickSubsystem extends SubsystemBase {
 		indexing = active;
 	}
 
+    public void setShuttling(boolean active) {
+        shuttling = active;
+    }
+
 	// useful for testing random modes
 	public void dotheThing(String command) {
 		sendCommand(command);
 	}
 
-	@Override
-	public void periodic() {
-		String wantedCommand;
+    @Override
+    public void periodic() {
+        String wantedCommand;
 
-		// balls are actually going into shooter
-		if (shooterRunning && indexing) {
-			wantedCommand = GREEN_FLICKER;
+        // blue whenever robot is disabled
+        if (DriverStation.isDisabled()) {
+            wantedCommand = DISABLED_MODE;
 
-		// shooter is ready
-		} else if (
-			shooterRunning
-				&& shooterReady.getAsBoolean()) {
+        // police lights while shuttling
+        } else if (shuttling) {
+            wantedCommand = POLICE_MODE;
 
-			wantedCommand = SOLID_GREEN;
+        // balls are actually going into shooter
+        } else if (shooterRunning && indexing) {
+            wantedCommand = GREEN_FLICKER;
 
-		// shooter is still getting up to speed
-		} else if (shooterRunning) {
-			wantedCommand = SOLID_RED;
+        // shooter is ready
+        } else if (
+            shooterRunning
+                && shooterReady.getAsBoolean()) {
 
-		// collecting balls
-		} else if (intaking || indexing) {
-			wantedCommand = MIKU_FLICKER;
+            wantedCommand = SOLID_GREEN;
 
-		// just driving around
-		} else {
-			wantedCommand = MIKU_MODE;
-		}
+        // shooter is still getting up to speed
+        } else if (shooterRunning) {
+            wantedCommand = SOLID_RED;
 
-		sendCommand(wantedCommand);
-	}
+        // collecting balls
+        } else if (intaking || indexing) {
+            wantedCommand = MIKU_FLICKER;
 
-	private void sendCommand(String command) {
-		// dont send the same thing every 20ms
-		if (command.equals(currentCommand)) {
-			return;
-		}
+        // just driving around
+        } else {
+            wantedCommand = MIKU_MODE;
+        }
 
-		currentCommand = command;
+        sendCommand(wantedCommand);
+    }
 
-		if (theStick != null) {
-			theStick.writeString(command);
-		}
+    private String getModeName(String command) {
+        if (command.equals(DISABLED_MODE)) {
+            return "Disabled - Solid Blue";
+        }
 
-		SmartDashboard.putString(
-			"LED/Current Mode",
-			command);
-	}
+        if (command.equals(MIKU_MODE)) {
+            return "Idle - Miku";
+        }
+
+        if (command.equals(MIKU_FLICKER)) {
+            return "Intaking - Miku Flicker";
+        }
+
+        if (command.equals(POLICE_MODE)) {
+            return "Shuttling - Police Mode";
+        }
+
+        if (command.equals(SOLID_RED)) {
+            return "Shooter Speeding Up - Red";
+        }
+
+        if (command.equals(SOLID_GREEN)) {
+            return "Shooter Ready - Green";
+        }
+
+        if (command.equals(GREEN_FLICKER)) {
+            return "Shooting - Green Flicker";
+        }
+
+        return "Unknown Command: " + command;
+    }
+
+    private void sendCommand(String command) {
+        // dont send the same thing every 20ms
+        if (command.equals(currentCommand)) {
+            return;
+        }
+
+        currentCommand = command;
+
+        if (theStick != null) {
+            theStick.writeString(command);
+        }
+
+        SmartDashboard.putString(
+            "LED/Current Status",
+            getModeName(command));
+    }
 }

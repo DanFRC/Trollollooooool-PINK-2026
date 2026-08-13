@@ -50,6 +50,7 @@ import swervelib.parser.SwerveDriveConfiguration;
 import swervelib.parser.SwerveParser;
 import swervelib.telemetry.SwerveDriveTelemetry;
 import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
+import com.pathplanner.lib.pathfinding.Pathfinding;
 
 public class SwerveSubsystem extends SubsystemBase
 {
@@ -117,8 +118,10 @@ public SwerveSubsystem(File directory) {
 	 * the drivetrain has been successfully constructed.
 	 */
   vision = new Vision(true);
+  // load pathfinding now instead of on the first button press
+Pathfinding.ensureInitialized();
 
-	setupPathPlanner();
+setupPathPlanner();
 }
   /**
    * Construct the swerve drive.
@@ -156,7 +159,10 @@ public SwerveSubsystem(
 
   vision = new Vision(true);
 
-	setupPathPlanner();
+  // load pathfinding now instead of on the first button press
+Pathfinding.ensureInitialized();
+
+setupPathPlanner();
 
   
   SmartDashboard.putData("Field", m_field);
