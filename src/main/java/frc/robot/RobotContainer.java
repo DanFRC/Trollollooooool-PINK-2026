@@ -259,7 +259,7 @@ private Command goToClosestPosition() {
         .button(5)
         .whileTrue(
             Commands.runOnce(
-                () -> theStickSubsystem.dotheThing("6")
+                () -> theStickSubsystem.sendCommand(6)
             )
         );
 
