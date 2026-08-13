@@ -16,13 +16,6 @@ public class ShooterSubsystem extends SubsystemBase {
 	private static final int FOLLOWER_MOTOR_ID = 13;
 	private static final int BEAM_BREAK_CHANNEL = 0;
 
-	/*
-	 * Verify this value for your actual shooter encoder.
-	 * Talon SRX velocity is reported in sensor units per 100 ms.
-	 */
-	private static final double SENSOR_UNITS_PER_REVOLUTION =
-		8192.0;
-
 	private static final double MIN_DISTANCE_METERS = 0.0;
 	private static final double MAX_DISTANCE_METERS = 3.0;
 
@@ -191,14 +184,14 @@ public class ShooterSubsystem extends SubsystemBase {
 		lastPublishedOutput = 0.0;
 	}
 
-	public double getRPM() {
-		double sensorUnitsPer100Milliseconds =
-			shooterMotor.getSelectedSensorVelocity();
-
-		return Math.abs(sensorUnitsPer100Milliseconds)
-			* 600.0
-			/ SENSOR_UNITS_PER_REVOLUTION;
-	}
+  public double getRPM() {
+  	return shooterMotor
+	  .getSelectedSensorVelocity()
+		/ 8192
+		* 0.1
+		* 60
+		* 100;
+  }
 
 	public double getEncoder() {
 		return shooterMotor.getSelectedSensorPosition();

@@ -6,6 +6,7 @@ package frc.robot;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Filesystem;
@@ -23,6 +24,9 @@ import frc.robot.subsystems.swervedrive.SwerveSubsystem;
 import java.io.File;
 import java.util.Set;
 
+//Commands
+import frc.robot.commands.swervedrive.drivebase.AimAtHopper;
+
 import swervelib.SwerveInputStream;
 
 // Auto Chooser stuff
@@ -33,6 +37,27 @@ public class RobotContainer {
   private static final double TRIGGER_DEADBAND = 0.01;
   private static final double SHOOTER_POWER_STEP = 0.01;
   private static final double BALL_INTAKE_POWER = 0.8;
+
+    // Odometry stuff
+    private Translation2d getAllianceHub() {
+	boolean isRed =
+		DriverStation
+			.getAlliance()
+			.orElse(Alliance.Blue)
+				== Alliance.Red;
+
+	return isRed
+		? new Translation2d(11.9155, 4.0346)
+		: new Translation2d(4.6255, 4.0346);
+    }
+
+    private double getDistanceToHub() {
+    	return drivebase
+    		.getPose()
+    		.getTranslation()
+	    	.getDistance(getAllianceHub());
+    }
+
 
 
   // Auto setup
@@ -201,14 +226,21 @@ private Command goToClosestPosition() {
         ));
 
     driverXbox
-        .rightTrigger(TRIGGER_DEADBAND)
-        .whileTrue(
-            Commands.runEnd(
-                () ->
-                    shooterSubsystem.runMotorRPM(
-                        2900),
-                shooterSubsystem::stopMotor,
-                shooterSubsystem));
+	    .rightTrigger(TRIGGER_DEADBAND)
+	    .whileTrue(
+    		Commands.parallel(
+    			new AimAtHopper(
+	    			drivebase,
+    				() -> -driverXbox.getLeftY(),
+	    			() -> -driverXbox.getLeftX()),
+
+	    		Commands.runEnd(
+	    			() ->
+	    				shooterSubsystem.runMotorRPM(
+	    					shooterSubsystem.getTargetRPM(
+	    						getDistanceToHub())),
+	    			shooterSubsystem::stopMotor,
+	    			shooterSubsystem)));
 
     driverXbox
         .y()
