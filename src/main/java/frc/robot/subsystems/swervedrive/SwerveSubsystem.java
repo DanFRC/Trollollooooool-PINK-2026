@@ -60,6 +60,9 @@ public class SwerveSubsystem extends SubsystemBase
   private Field2d m_field = new Field2d();
 
 public SwerveSubsystem(File directory) {
+
+  SmartDashboard.putData("Field", m_field);
+
 	boolean blueAlliance =
 		DriverStation.getAlliance().isPresent()
 			&& DriverStation.getAlliance().get()
@@ -154,6 +157,9 @@ public SwerveSubsystem(
   vision = new Vision(true);
 
 	setupPathPlanner();
+
+  
+  SmartDashboard.putData("Field", m_field);
 }
 
   @Override
@@ -161,8 +167,6 @@ public SwerveSubsystem(
 	  vision.updatePoseEstimation(swerveDrive);
 
     m_field.setRobotPose(getPose());
-    
-    SmartDashboard.putData("Field", m_field);
   }
 
   @Override

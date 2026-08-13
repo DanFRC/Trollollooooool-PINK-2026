@@ -12,76 +12,103 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 import java.util.List;
 import java.util.Optional;
+
 import org.photonvision.EstimatedRobotPose;
 import org.photonvision.PhotonCamera;
 import org.photonvision.PhotonPoseEstimator;
 import org.photonvision.targeting.PhotonPipelineResult;
+import org.photonvision.targeting.PhotonTrackedTarget;
+
 import swervelib.SwerveDrive;
 
 public final class Vision {
-	private static final String CAMERA_NAME = "FRONT_RIGHT";
-
-	private static final String CAMERA2_NAME = "BACK_RIGHT";
-
 	private static final double MAX_SINGLE_TAG_AMBIGUITY = 0.20;
 	private static final double MAX_SINGLE_TAG_DISTANCE_METERS = 4.0;
 	private static final double MAX_POSE_HEIGHT_ERROR_METERS = 0.50;
 
-	/*
-	 * Dashboard data is published every 10 robot loops,
-	 * which is approximately every 200 milliseconds.
-	 */
 	private static final int TELEMETRY_PERIOD_LOOPS = 10;
 
-	// these positions are temporary
-	private static final Transform3d ROBOT_TO_CAMERA =
-		new Transform3d(
-			new Translation3d(
-				0.0,
-				0.0,
-				0.0),
-			new Rotation3d(
-				0.0,
-				0.0,
-				45.0));
-
-	/*
-	 * WPILib's default 2026 field is REBUILT welded.
-	 */
 	private static final AprilTagFieldLayout FIELD_LAYOUT =
 		AprilTagFieldLayout.loadField(
 			AprilTagFields.kDefaultField);
 
-	/*
-	 * Single-tag position estimates receive lower trust.
-	 * Single-tag rotation is effectively ignored.
-	 */
 	private static final Matrix<N3, N1> SINGLE_TAG_STD_DEVS =
 		VecBuilder.fill(
 			0.9,
 			0.9,
 			Double.MAX_VALUE);
 
-	/*
-	 * Multi-tag measurements receive higher trust.
-	 */
 	private static final Matrix<N3, N1> MULTI_TAG_STD_DEVS =
 		VecBuilder.fill(
 			0.4,
 			0.4,
 			0.8);
 
-	private final PhotonCamera camera =
-		new PhotonCamera(CAMERA_NAME);
+	private static final Transform3d ROBOT_TO_FRONT_RIGHT =
+		createTransform(
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			45.0);
 
-	private final PhotonCamera frontRight = new PhotonCamera(CAMERA2_NAME);
+	private static final Transform3d ROBOT_TO_FRONT_LEFT =
+		createTransform(
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			-45.0);
 
-	private final PhotonPoseEstimator poseEstimator =
-		new PhotonPoseEstimator(
-			FIELD_LAYOUT,
-			ROBOT_TO_CAMERA);
+	private static final Transform3d ROBOT_TO_BACK_RIGHT =
+		createTransform(
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			135.0);
+
+	private static final Transform3d ROBOT_TO_BACK_LEFT =
+		createTransform(
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			-135.0);
+
+	private record CameraConfig(
+		String name,
+		PhotonCamera camera,
+		PhotonPoseEstimator poseEstimator) {}
+
+	private record VisionMeasurement(
+		String cameraName,
+		EstimatedRobotPose estimate) {}
+
+	private final List<CameraConfig> cameras =
+		List.of(
+			createCamera(
+				"FRONT_RIGHT",
+				ROBOT_TO_FRONT_RIGHT),
+
+			createCamera(
+				"FRONT_LEFT",
+				ROBOT_TO_FRONT_LEFT),
+
+			createCamera(
+				"BACK_RIGHT",
+				ROBOT_TO_BACK_RIGHT),
+
+			createCamera(
+				"BACK_LEFT",
+				ROBOT_TO_BACK_LEFT));
 
 	private final boolean odometryUpdatesEnabled;
 
@@ -92,12 +119,9 @@ public final class Vision {
 	private Pose2d latestVisionPose =
 		new Pose2d();
 
-	/**
-	 * Creates the real PhotonVision camera interface.
-	 *
-	 * @param odometryUpdatesEnabled true to allow vision measurements
-	 *                               to update drivetrain odometry
-	 */
+	private String latestCameraName =
+		"None";
+
 	public Vision(boolean odometryUpdatesEnabled) {
 		this.odometryUpdatesEnabled =
 			odometryUpdatesEnabled;
@@ -105,139 +129,197 @@ public final class Vision {
 		SmartDashboard.putString(
 			"Vision/Status",
 			odometryUpdatesEnabled
-				? "Waiting for BackRight"
-				: "Disabled until camera calibration");
+				? "Waiting for cameras"
+				: "Odometry updates disabled");
 	}
 
-	/**
-	 * Reads all new camera frames and adds valid measurements
-	 * to the swerve pose estimator.
-	 */
+	private static Transform3d createTransform(
+		double xMeters,
+		double yMeters,
+		double zMeters,
+		double rollDegrees,
+		double pitchDegrees,
+		double yawDegrees) {
+
+		return new Transform3d(
+			new Translation3d(
+				xMeters,
+				yMeters,
+				zMeters),
+			new Rotation3d(
+				Math.toRadians(rollDegrees),
+				Math.toRadians(pitchDegrees),
+				Math.toRadians(yawDegrees)));
+	}
+
+	private static CameraConfig createCamera(
+		String cameraName,
+		Transform3d robotToCamera) {
+
+		return new CameraConfig(
+			cameraName,
+			new PhotonCamera(cameraName),
+			new PhotonPoseEstimator(
+				FIELD_LAYOUT,
+				robotToCamera));
+	}
+
 	public void updatePoseEstimation(
 		SwerveDrive swerveDrive) {
 
 		publishTelemetry();
 
-		if (!odometryUpdatesEnabled
-			|| !camera.isConnected()) {
+		if (!odometryUpdatesEnabled) {
+			return;
+		}
+
+		for (CameraConfig cameraConfig : cameras) {
+			processCamera(
+				cameraConfig,
+				swerveDrive);
+		}
+	}
+
+	private void processCamera(
+		CameraConfig cameraConfig,
+		SwerveDrive swerveDrive) {
+
+		if (!cameraConfig.camera().isConnected()) {
 			return;
 		}
 
 		List<PhotonPipelineResult> unreadResults =
-			camera.getAllUnreadResults();
+			cameraConfig
+				.camera()
+				.getAllUnreadResults();
 
 		for (PhotonPipelineResult result : unreadResults) {
-			if (!result.hasTargets()) {
-				continue;
-			}
-
-			/*
-			 * First try MultiTag pose estimation from the
-			 * Orange Pi 5+.
-			 */
-			Optional<EstimatedRobotPose> estimate =
-				poseEstimator.estimateCoprocMultiTagPose(
+			Optional<VisionMeasurement> measurement =
+				createMeasurement(
+					cameraConfig,
 					result);
 
-			/*
-			 * If MultiTag is unavailable, use the
-			 * lowest-ambiguity single tag.
-			 */
-			if (estimate.isEmpty()) {
-				estimate =
-					poseEstimator.estimateLowestAmbiguityPose(
-						result);
-			}
-
-			if (estimate.isEmpty()) {
-				rejectedMeasurements++;
+			if (measurement.isEmpty()) {
 				continue;
 			}
 
-			EstimatedRobotPose measurement =
-				estimate.get();
-
-			if (!isMeasurementValid(measurement)) {
-				rejectedMeasurements++;
-				continue;
-			}
-
-			latestVisionPose =
-				measurement.estimatedPose.toPose2d();
-
-			swerveDrive.addVisionMeasurement(
-				latestVisionPose,
-				measurement.timestampSeconds,
-				calculateStandardDeviations(
-					measurement));
-
-			acceptedMeasurements++;
+			addMeasurement(
+				measurement.get(),
+				swerveDrive);
 		}
 	}
 
-	/**
-	 * Rejects poses that are outside the field, above or below
-	 * the floor, too ambiguous, or too far from a single tag.
-	 */
-	private boolean isMeasurementValid(
-		
-		EstimatedRobotPose measurement) { return true;
+	private Optional<VisionMeasurement> createMeasurement(
+		CameraConfig cameraConfig,
+		PhotonPipelineResult result) {
 
-		// Pose3d pose3d =
-		// 	measurement.estimatedPose;
+		if (!result.hasTargets()) {
+			return Optional.empty();
+		}
 
-		// Pose2d pose2d =
-		// 	pose3d.toPose2d();
+		Optional<EstimatedRobotPose> estimate =
+			cameraConfig
+				.poseEstimator()
+				.estimateCoprocMultiTagPose(result);
 
-		// boolean insideField =
-		// 	pose2d.getX() >= 0.0
-		// 		&& pose2d.getX()
-		// 			<= FIELD_LAYOUT.getFieldLength()
-		// 		&& pose2d.getY() >= 0.0
-		// 		&& pose2d.getY()
-		// 			<= FIELD_LAYOUT.getFieldWidth();
+		if (estimate.isEmpty()) {
+			estimate =
+				cameraConfig
+					.poseEstimator()
+					.estimateLowestAmbiguityPose(result);
+		}
 
-		// if (!insideField) {
-		// 	return false;
-		// }
+		if (estimate.isEmpty()) {
+			rejectedMeasurements++;
+			return Optional.empty();
+		}
 
-		// if (Math.abs(pose3d.getZ())
-		// 	> MAX_POSE_HEIGHT_ERROR_METERS) {
-		// 	return false;
-		// }
+		if (!isMeasurementValid(estimate.get())) {
+			rejectedMeasurements++;
+			return Optional.empty();
+		}
 
-		// if (measurement.targetsUsed.isEmpty()) {
-		// 	return false;
-		// }
-
-		// /*
-		//  * Accept an in-field MultiTag measurement.
-		//  */
-		// if (measurement.targetsUsed.size() > 1) {
-		// 	return true;
-		// }
-
-		// PhotonTrackedTarget target =
-		// 	measurement.targetsUsed.get(0);
-
-		// double ambiguity =
-		// 	target.getPoseAmbiguity();
-
-		// double distance =
-		// 	target
-		// 		.getBestCameraToTarget()
-		// 		.getTranslation()
-		// 		.getNorm();
-
-		// return ambiguity >= 0.0
-		// 	&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
-		// 	&& distance
-		// 		<= MAX_SINGLE_TAG_DISTANCE_METERS;
+		return Optional.of(
+			new VisionMeasurement(
+				cameraConfig.name(),
+				estimate.get()));
 	}
 
-	/**
-	 * Calculates how strongly odometry should trust a measurement.
-	 */
+	private void addMeasurement(
+		VisionMeasurement visionMeasurement,
+		SwerveDrive swerveDrive) {
+
+		EstimatedRobotPose measurement =
+			visionMeasurement.estimate();
+
+		latestVisionPose =
+			measurement.estimatedPose.toPose2d();
+
+		latestCameraName =
+			visionMeasurement.cameraName();
+
+		swerveDrive.addVisionMeasurement(
+			latestVisionPose,
+			measurement.timestampSeconds,
+			calculateStandardDeviations(
+				measurement));
+
+		acceptedMeasurements++;
+	}
+
+	private boolean isMeasurementValid(
+		EstimatedRobotPose measurement) {
+
+		Pose3d pose3d =
+			measurement.estimatedPose;
+
+		Pose2d pose2d =
+			pose3d.toPose2d();
+
+		boolean insideField =
+			pose2d.getX() >= 0.0
+				&& pose2d.getX()
+					<= FIELD_LAYOUT.getFieldLength()
+				&& pose2d.getY() >= 0.0
+				&& pose2d.getY()
+					<= FIELD_LAYOUT.getFieldWidth();
+
+		if (!insideField) {
+			return false;
+		}
+
+		if (Math.abs(pose3d.getZ())
+			> MAX_POSE_HEIGHT_ERROR_METERS) {
+
+			return false;
+		}
+
+		if (measurement.targetsUsed.isEmpty()) {
+			return false;
+		}
+
+		if (measurement.targetsUsed.size() > 1) {
+			return true;
+		}
+
+		PhotonTrackedTarget target =
+			measurement.targetsUsed.get(0);
+
+		double ambiguity =
+			target.getPoseAmbiguity();
+
+		double distance =
+			target
+				.getBestCameraToTarget()
+				.getTranslation()
+				.getNorm();
+
+		return ambiguity >= 0.0
+			&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
+			&& distance
+				<= MAX_SINGLE_TAG_DISTANCE_METERS;
+	}
+
 	private Matrix<N3, N1> calculateStandardDeviations(
 		EstimatedRobotPose measurement) {
 
@@ -261,10 +343,6 @@ public final class Vision {
 				? MULTI_TAG_STD_DEVS
 				: SINGLE_TAG_STD_DEVS;
 
-		/*
-		 * Increase uncertainty as the camera gets farther
-		 * from the detected tags.
-		 */
 		double distanceScale =
 			1.0
 				+ (averageDistance
@@ -275,26 +353,37 @@ public final class Vision {
 			distanceScale);
 	}
 
-	/**
-	 * Publishes vision health and pose information without
-	 * sending NetworkTables updates every robot loop.
-	 */
 	private void publishTelemetry() {
 		telemetryCounter++;
 
 		if (telemetryCounter
 			< TELEMETRY_PERIOD_LOOPS) {
+
 			return;
 		}
 
 		telemetryCounter = 0;
 
-		boolean cameraConnected =
-			camera.isConnected();
+		int connectedCameraCount = 0;
 
-		SmartDashboard.putBoolean(
-			"Vision/BackRight Connected",
-			cameraConnected);
+		for (CameraConfig cameraConfig : cameras) {
+			boolean connected =
+				cameraConfig.camera().isConnected();
+
+			if (connected) {
+				connectedCameraCount++;
+			}
+
+			SmartDashboard.putBoolean(
+				"Vision/"
+					+ cameraConfig.name()
+					+ "/Connected",
+				connected);
+		}
+
+		SmartDashboard.putNumber(
+			"Vision/Connected Camera Count",
+			connectedCameraCount);
 
 		SmartDashboard.putBoolean(
 			"Vision/Odometry Enabled",
@@ -303,10 +392,14 @@ public final class Vision {
 		SmartDashboard.putString(
 			"Vision/Status",
 			!odometryUpdatesEnabled
-				? "Disabled until camera calibration"
-				: cameraConnected
+				? "Odometry updates disabled"
+				: connectedCameraCount > 0
 					? "Updating odometry"
-					: "BackRight disconnected");
+					: "All cameras disconnected");
+
+		SmartDashboard.putString(
+			"Vision/Latest Camera",
+			latestCameraName);
 
 		SmartDashboard.putNumber(
 			"Vision/Accepted Measurements",
