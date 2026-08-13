@@ -31,7 +31,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class RobotContainer {
   private static final double TRIGGER_DEADBAND = 0.01;
-  private static final double SHOOTER_POWER_STEP = 0.1;
+  private static final double SHOOTER_POWER_STEP = 0.01;
   private static final double BALL_INTAKE_POWER = 0.8;
 
 
@@ -160,10 +160,10 @@ private Command goToClosestPosition() {
   private final SwerveInputStream fieldOrientedDrive =
       SwerveInputStream.of(
               drivebase.getSwerveDrive(),
-              () -> driverXbox.getLeftY(),
-              () -> driverXbox.getLeftX())
+              () -> -driverXbox.getLeftY(),
+              () -> -driverXbox.getLeftX())
           .withControllerRotationAxis(
-              () -> driverXbox.getRightX())
+              () -> -driverXbox.getRightX())
           .deadband(OperatorConstants.DEADBAND)
           .scaleTranslation(0.8)
           .allianceRelativeControl(true);
@@ -175,16 +175,31 @@ private Command goToClosestPosition() {
         drivebase.driveFieldOriented(fieldOrientedDrive));
 
     configureBindings();
+
+    configureAutoSelector();
   }
 
   private void configureBindings() {
-    /*
-     * Shooter
-     *
-     * Right trigger: run shooter
-     * Y: increase power
-     * A: decrease power
-     */
+
+    // Temporary Servoing
+    driverXbox
+        .povRight()
+        .whileTrue(Commands.runOnce(
+        () -> {
+            climberSubsystem.openServo(1);
+            ballIntakeSubsystem.openServo();
+        }
+        ));
+        // Temporary Servoing
+    driverXbox
+        .povLeft()
+        .whileTrue(Commands.runOnce(
+        () -> {
+            climberSubsystem.stopServo();
+            ballIntakeSubsystem.closeServo();
+        }
+        ));
+
     driverXbox
         .rightTrigger(TRIGGER_DEADBAND)
         .whileTrue(
@@ -255,7 +270,7 @@ private Command goToClosestPosition() {
      * D-pad down: climb down
      */
 driverXbox
-    .povUp()
+    .povDown()
     .whileTrue(
         Commands.runEnd(
             () -> climberSubsystem.runMotor(1.0),
@@ -263,7 +278,7 @@ driverXbox
             climberSubsystem));
 
 driverXbox
-    .povDown()
+    .povUp()
     .whileTrue(
         Commands.runEnd(
             () -> climberSubsystem.runMotor(-1.0),

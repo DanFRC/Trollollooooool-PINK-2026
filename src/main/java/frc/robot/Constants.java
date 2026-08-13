@@ -45,8 +45,8 @@ public final class Constants
     public static final double WHEEL_LOCK_TIME = 10; // seconds
 
     // Min-Max values used in the climber subsystem.
-    public static final double climberMaxPosition = 4000;
-    public static final double climberMinPosition = -800;
+    public static final double climberMaxPosition = 6300;
+    public static final double climberMinPosition = 0;
   }
 
   public static class OperatorConstants

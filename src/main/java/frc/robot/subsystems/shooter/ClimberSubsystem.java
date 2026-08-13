@@ -8,15 +8,18 @@ import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.VictorSPX;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.Encoder;
+import edu.wpi.first.wpilibj.Servo;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DrivebaseConstants;
 
 public class ClimberSubsystem extends SubsystemBase {
   private static final int CLIMBER_MOTOR_ID = 15;
+  private static final int SERVO_ID = 1;
+  private static final double SERVO_START_POINT = 0;
 
-  private static final int ENCODER_CHANNEL_A = 8;
-  private static final int ENCODER_CHANNEL_B = 9;
+  private static final int ENCODER_CHANNEL_A = 5;
+  private static final int ENCODER_CHANNEL_B = 6;
 
   private static final double MAX_POSITION =
       DrivebaseConstants.climberMaxPosition;
@@ -38,6 +41,8 @@ public class ClimberSubsystem extends SubsystemBase {
           ENCODER_CHANNEL_A,
           ENCODER_CHANNEL_B);
 
+  private final Servo climberServo = new Servo(SERVO_ID);
+
   private int telemetryCounter;
 
   public ClimberSubsystem() {
@@ -55,6 +60,10 @@ public class ClimberSubsystem extends SubsystemBase {
           "Climber/Encoder Position",
           getPosition());
     }
+    SmartDashboard.putNumber(
+      "Climber/Servo Position",
+      climberServo.get()
+    );
   }
 
   public void runMotor(double requestedOutput) {
@@ -63,16 +72,12 @@ public class ClimberSubsystem extends SubsystemBase {
 
     double position = getPosition();
 
-    /*
-     * Positive output is assumed to increase the encoder.
-     * Negative output is assumed to decrease the encoder.
-     */
-    if (output > 0.0 && position >= MAX_POSITION) {
+    if (output < 0.0 && position >= MAX_POSITION) {
       stopMotor();
       return;
     }
 
-    if (output < 0.0 && position <= MIN_POSITION) {
+    if (output > 0.0 && position <= MIN_POSITION) {
       stopMotor();
       return;
     }
@@ -102,6 +107,14 @@ public class ClimberSubsystem extends SubsystemBase {
     climberMotor.set(
         ControlMode.PercentOutput,
         0.0);
+  }
+
+  public void openServo(double speed) {
+    climberServo.set(speed);
+  }
+
+  public void stopServo() {
+    climberServo.set(SERVO_START_POINT);
   }
 
   public double getPosition() {

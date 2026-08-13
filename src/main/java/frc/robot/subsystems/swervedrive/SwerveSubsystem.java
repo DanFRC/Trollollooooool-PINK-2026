@@ -25,6 +25,8 @@ import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -54,6 +56,8 @@ public class SwerveSubsystem extends SubsystemBase
   private final SwerveDrive swerveDrive;
 
   private final Vision vision;
+
+  private Field2d m_field = new Field2d();
 
 public SwerveSubsystem(File directory) {
 	boolean blueAlliance =
@@ -109,7 +113,7 @@ public SwerveSubsystem(File directory) {
 	 * Create the real PhotonVision camera interface after
 	 * the drivetrain has been successfully constructed.
 	 */
-  vision = new Vision(false);
+  vision = new Vision(true);
 
 	setupPathPlanner();
 }
@@ -147,7 +151,7 @@ public SwerveSubsystem(
 		false,
 		1.0);
 
-  vision = new Vision(false);
+  vision = new Vision(true);
 
 	setupPathPlanner();
 }
@@ -155,6 +159,10 @@ public SwerveSubsystem(
   @Override
   public void periodic() {
 	  vision.updatePoseEstimation(swerveDrive);
+
+    m_field.setRobotPose(getPose());
+    
+    SmartDashboard.putData("Field", m_field);
   }
 
   @Override

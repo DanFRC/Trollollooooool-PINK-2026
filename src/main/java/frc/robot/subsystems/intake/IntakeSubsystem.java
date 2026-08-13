@@ -3,6 +3,7 @@
 // the WPILib BSD license file in the root directory of this project.
 
 package frc.robot.subsystems.intake;
+import edu.wpi.first.wpilibj.Servo;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -12,6 +13,9 @@ import com.ctre.phoenix.motorcontrol.can.VictorSPX;
 public class IntakeSubsystem extends SubsystemBase {
 
   private VictorSPX intakeMotor = new VictorSPX(16);
+  private Servo servo = new Servo(0);
+  private static double SERVO_START_POINT = 1;
+  private static double SERVO_OPEN_POINT = 0;
 
 
   // testing purposes dw
@@ -22,6 +26,8 @@ public class IntakeSubsystem extends SubsystemBase {
   /** Creates a new ExampleSubsystem. */
   public IntakeSubsystem() {
     intakeMotor.setInverted(true);
+
+    servo.set(SERVO_START_POINT);
   }
 
   /**
@@ -53,6 +59,14 @@ public class IntakeSubsystem extends SubsystemBase {
 
     // This method will be called once per scheduler run
     
+  }
+
+  public void openServo() {
+    servo.set(SERVO_OPEN_POINT);
+  }
+
+  public void closeServo() {
+    servo.set(SERVO_START_POINT);
   }
 
   public void runMotor(double output) {

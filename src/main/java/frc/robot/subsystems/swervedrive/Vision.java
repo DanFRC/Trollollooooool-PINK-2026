@@ -18,15 +18,12 @@ import org.photonvision.EstimatedRobotPose;
 import org.photonvision.PhotonCamera;
 import org.photonvision.PhotonPoseEstimator;
 import org.photonvision.targeting.PhotonPipelineResult;
-import org.photonvision.targeting.PhotonTrackedTarget;
 import swervelib.SwerveDrive;
 
-/**
- * Uses the physical BackRight PhotonVision camera to estimate
- * field position and correct swerve odometry.
- */
 public final class Vision {
-	private static final String CAMERA_NAME = "BackRight";
+	private static final String CAMERA_NAME = "FRONT_RIGHT";
+
+	private static final String CAMERA2_NAME = "BACK_RIGHT";
 
 	private static final double MAX_SINGLE_TAG_AMBIGUITY = 0.20;
 	private static final double MAX_SINGLE_TAG_DISTANCE_METERS = 4.0;
@@ -38,20 +35,7 @@ public final class Vision {
 	 */
 	private static final int TELEMETRY_PERIOD_LOOPS = 10;
 
-	/*
-	 * Temporary camera position:
-	 *
-	 * X = 0 metres
-	 * Y = 0 metres
-	 * Z = 0 metres
-	 *
-	 * Roll = 0 radians
-	 * Pitch = 0 radians
-	 * Yaw = 0 radians
-	 *
-	 * Replace these values with real measurements before
-	 * enabling odometry updates.
-	 */
+	// these positions are temporary
 	private static final Transform3d ROBOT_TO_CAMERA =
 		new Transform3d(
 			new Translation3d(
@@ -61,7 +45,7 @@ public final class Vision {
 			new Rotation3d(
 				0.0,
 				0.0,
-				0.0));
+				45.0));
 
 	/*
 	 * WPILib's default 2026 field is REBUILT welded.
@@ -91,6 +75,8 @@ public final class Vision {
 
 	private final PhotonCamera camera =
 		new PhotonCamera(CAMERA_NAME);
+
+	private final PhotonCamera frontRight = new PhotonCamera(CAMERA2_NAME);
 
 	private final PhotonPoseEstimator poseEstimator =
 		new PhotonPoseEstimator(
@@ -194,58 +180,59 @@ public final class Vision {
 	 * the floor, too ambiguous, or too far from a single tag.
 	 */
 	private boolean isMeasurementValid(
-		EstimatedRobotPose measurement) {
+		
+		EstimatedRobotPose measurement) { return true;
 
-		Pose3d pose3d =
-			measurement.estimatedPose;
+		// Pose3d pose3d =
+		// 	measurement.estimatedPose;
 
-		Pose2d pose2d =
-			pose3d.toPose2d();
+		// Pose2d pose2d =
+		// 	pose3d.toPose2d();
 
-		boolean insideField =
-			pose2d.getX() >= 0.0
-				&& pose2d.getX()
-					<= FIELD_LAYOUT.getFieldLength()
-				&& pose2d.getY() >= 0.0
-				&& pose2d.getY()
-					<= FIELD_LAYOUT.getFieldWidth();
+		// boolean insideField =
+		// 	pose2d.getX() >= 0.0
+		// 		&& pose2d.getX()
+		// 			<= FIELD_LAYOUT.getFieldLength()
+		// 		&& pose2d.getY() >= 0.0
+		// 		&& pose2d.getY()
+		// 			<= FIELD_LAYOUT.getFieldWidth();
 
-		if (!insideField) {
-			return false;
-		}
+		// if (!insideField) {
+		// 	return false;
+		// }
 
-		if (Math.abs(pose3d.getZ())
-			> MAX_POSE_HEIGHT_ERROR_METERS) {
-			return false;
-		}
+		// if (Math.abs(pose3d.getZ())
+		// 	> MAX_POSE_HEIGHT_ERROR_METERS) {
+		// 	return false;
+		// }
 
-		if (measurement.targetsUsed.isEmpty()) {
-			return false;
-		}
+		// if (measurement.targetsUsed.isEmpty()) {
+		// 	return false;
+		// }
 
-		/*
-		 * Accept an in-field MultiTag measurement.
-		 */
-		if (measurement.targetsUsed.size() > 1) {
-			return true;
-		}
+		// /*
+		//  * Accept an in-field MultiTag measurement.
+		//  */
+		// if (measurement.targetsUsed.size() > 1) {
+		// 	return true;
+		// }
 
-		PhotonTrackedTarget target =
-			measurement.targetsUsed.get(0);
+		// PhotonTrackedTarget target =
+		// 	measurement.targetsUsed.get(0);
 
-		double ambiguity =
-			target.getPoseAmbiguity();
+		// double ambiguity =
+		// 	target.getPoseAmbiguity();
 
-		double distance =
-			target
-				.getBestCameraToTarget()
-				.getTranslation()
-				.getNorm();
+		// double distance =
+		// 	target
+		// 		.getBestCameraToTarget()
+		// 		.getTranslation()
+		// 		.getNorm();
 
-		return ambiguity >= 0.0
-			&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
-			&& distance
-				<= MAX_SINGLE_TAG_DISTANCE_METERS;
+		// return ambiguity >= 0.0
+		// 	&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
+		// 	&& distance
+		// 		<= MAX_SINGLE_TAG_DISTANCE_METERS;
 	}
 
 	/**
