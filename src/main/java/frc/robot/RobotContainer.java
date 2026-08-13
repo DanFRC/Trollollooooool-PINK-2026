@@ -41,6 +41,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 public class RobotContainer {
     private static final double TRIGGER_DEADBAND = 0.01;
     private static final double SHOOTER_POWER_STEP = 0.01;
+    private static final double TEST_DRIVE_SCALE = 0.2;
     private static final double BALL_INTAKE_POWER = 0.8;
 
     private static final double AUTO_SHOOT_TIMEOUT = 4.0;
@@ -270,6 +271,12 @@ private Command goToClosestPosition() {
 		  .scaleTranslation(0.8)
 		  .allianceRelativeControl(true);
 
+  // same field drive but slow for testing mechanisms
+  private final SwerveInputStream testFieldOrientedDrive =
+      fieldOrientedDrive.copy()
+		  .scaleTranslation(TEST_DRIVE_SCALE)
+		  .scaleRotation(TEST_DRIVE_SCALE);
+
   public RobotContainer() {
     DriverStation.silenceJoystickConnectionWarning(true);
 
@@ -279,6 +286,9 @@ private Command goToClosestPosition() {
 				if (DriverStation.isTeleopEnabled()) {
 					drivebase.driveFieldOriented(
 						fieldOrientedDrive.get());
+				} else if (DriverStation.isTestEnabled()) {
+					drivebase.driveFieldOriented(
+						testFieldOrientedDrive.get());
 				} else {
 					// dont let the sticks drive after auto finishes
 					drivebase.drive(
@@ -327,6 +337,80 @@ private void configureBindings() {
 	Trigger teleopEnabled =
 		new Trigger(
 			DriverStation::isTeleopEnabled);
+
+	Trigger testEnabled =
+		new Trigger(
+			DriverStation::isTestEnabled);
+
+	// TEST MODE CONTROLS
+
+	// right trigger runs shooter at selected percent
+	driverXbox
+		.rightTrigger(TRIGGER_DEADBAND)
+		.and(testEnabled)
+		.whileTrue(
+			Commands.runEnd(
+				() -> {
+					shooterSubsystem.runMotor(
+						shooterSubsystem.getPowerPercentage());
+
+					theStickSubsystem
+						.setShooterRunning(true);
+				},
+				() -> {
+					shooterSubsystem.stopMotor();
+
+					theStickSubsystem
+						.setShooterRunning(false);
+				},
+				shooterSubsystem));
+
+	// pov up adds 1 percent shooter power
+	driverXbox
+		.povUp()
+		.and(testEnabled)
+		.onTrue(
+			Commands.runOnce(
+				() ->
+					shooterSubsystem.increasePowerBy(
+						SHOOTER_POWER_STEP)));
+
+	// pov down removes 1 percent shooter power
+	driverXbox
+		.povDown()
+		.and(testEnabled)
+		.onTrue(
+			Commands.runOnce(
+				() ->
+					shooterSubsystem.increasePowerBy(
+						-SHOOTER_POWER_STEP)));
+
+	// left trigger runs indexer and conveyor like teleop
+	driverXbox
+		.leftTrigger(TRIGGER_DEADBAND)
+		.and(testEnabled)
+		.whileTrue(
+			Commands.runEnd(
+				() -> {
+					double power =
+						driverXbox
+							.getLeftTriggerAxis();
+
+					intakeSubsystem.runMotor(power);
+					conveyorSubsystem.runMotor(power);
+
+					theStickSubsystem
+						.setIndexing(true);
+				},
+				() -> {
+					intakeSubsystem.runMotor(0.0);
+					conveyorSubsystem.runMotor(0.0);
+
+					theStickSubsystem
+						.setIndexing(false);
+				},
+				intakeSubsystem,
+				conveyorSubsystem));
 
 	// aim at hub and shoot
     Trigger rightTrigger =
