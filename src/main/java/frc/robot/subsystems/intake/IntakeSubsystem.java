@@ -15,7 +15,7 @@ public class IntakeSubsystem extends SubsystemBase {
   private VictorSPX intakeMotor = new VictorSPX(16);
   private Servo servo = new Servo(0);
   private static double SERVO_START_POINT = 1;
-  private static double SERVO_OPEN_POINT = 0;
+  private static double SERVO_OPEN_POINT = 0.5;
 
 
   // testing purposes dw

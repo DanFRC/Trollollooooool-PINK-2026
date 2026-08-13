@@ -205,8 +205,8 @@ private Command goToClosestPosition() {
         .whileTrue(
             Commands.runEnd(
                 () ->
-                    shooterSubsystem.runMotor(
-                        shooterSubsystem.getPowerPercentage()),
+                    shooterSubsystem.runMotorRPM(
+                        2900),
                 shooterSubsystem::stopMotor,
                 shooterSubsystem));
 
@@ -330,8 +330,11 @@ driverXbox
   // Auto
   private void configureAutoSelector() {
 	autoChooser.setDefaultOption(
-		"Do Nothing",
-		Commands.none());
+		"Open Intake",
+		Commands.sequence(Commands.runOnce(() -> {
+            ballIntakeSubsystem.closeServo();
+            ballIntakeSubsystem.openServo();
+        })));
 
 	SmartDashboard.putData(
 		"Autonomous Selector",
@@ -339,6 +342,9 @@ driverXbox
 }
 
 public Command getAutonomousCommand() {
+
+
+
 	return autoChooser.getSelected();
 }
 
