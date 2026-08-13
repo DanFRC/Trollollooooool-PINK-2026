@@ -87,8 +87,9 @@ public class RobotContainer {
     private final ConveyorSubsystem conveyorSubsystem =
         new ConveyorSubsystem();
 
-    private final TheStickSubsystem theStickSubsystem = 
-        new TheStickSubsystem();
+    private final TheStickSubsystem theStickSubsystem =
+        new TheStickSubsystem(
+            shooterSubsystem::isAtTargetRPM);
 
   // go to commands
   private static final double BLUE_HOME_ZONE_LIMIT = 4.5;
@@ -204,161 +205,141 @@ private Command goToClosestPosition() {
     configureAutoSelector();
   }
 
-  private void configureBindings() {
+private void configureBindings() {
+	// aim at hub and shoot
+	driverXbox
+		.rightTrigger(TRIGGER_DEADBAND)
+		.whileTrue(
+			Commands.parallel(
+				new AimAtHopper(
+					drivebase,
+					() -> -driverXbox.getLeftY(),
+					() -> -driverXbox.getLeftX()),
 
-    // Temporary Servoing
-    driverXbox
-        .povRight()
-        .whileTrue(Commands.runOnce(
-        () -> {
-            climberSubsystem.openServo(1);
-            ballIntakeSubsystem.openServo();
-        }
-        ));
-        // Temporary Servoing
-    driverXbox
-        .povLeft()
-        .whileTrue(Commands.runOnce(
-        () -> {
-            climberSubsystem.stopServo();
-            ballIntakeSubsystem.closeServo();
-        }
-        ));
+				Commands.runEnd(
+					() -> {
+						theStickSubsystem
+							.setShooterRunning(true);
 
-    driverXbox
-	    .rightTrigger(TRIGGER_DEADBAND)
-	    .whileTrue(
-    		Commands.parallel(
-    			new AimAtHopper(
-	    			drivebase,
-    				() -> -driverXbox.getLeftY(),
-	    			() -> -driverXbox.getLeftX()),
+						shooterSubsystem
+							.runMotorForDistance(
+								getDistanceToHub());
+					},
+					() -> {
+						shooterSubsystem.stopMotor();
 
-	    		Commands.runEnd(
-	    			() ->
-	    				shooterSubsystem.runMotorRPM(
-	    					shooterSubsystem.getTargetRPM(
-	    						getDistanceToHub())),
-	    			shooterSubsystem::stopMotor,
-	    			shooterSubsystem)));
+						theStickSubsystem
+							.setShooterRunning(false);
+					},
+					shooterSubsystem)));
 
-    driverXbox
-        .y()
-        .onTrue(
-            Commands.runOnce(
-                () ->
-                    shooterSubsystem.increasePowerBy(
-                        SHOOTER_POWER_STEP)));
+	// increase shooter setting
+	driverXbox
+		.y()
+		.onTrue(
+			Commands.runOnce(
+				() ->
+					shooterSubsystem.increasePowerBy(
+						SHOOTER_POWER_STEP)));
 
-    driverXbox
-        .a()
-        .onTrue(
-            Commands.runOnce(
-                () ->
-                    shooterSubsystem.increasePowerBy(
-                        -SHOOTER_POWER_STEP)));
+	// decrease shooter setting
+	driverXbox
+		.a()
+		.onTrue(
+			Commands.runOnce(
+				() ->
+					shooterSubsystem.increasePowerBy(
+						-SHOOTER_POWER_STEP)));
 
-    /*
-     * Main intake
-     *
-     * Left trigger: proportional intake power
-     */
-    driverXbox
-        .leftTrigger(TRIGGER_DEADBAND)
-        .whileTrue(
-            Commands.runEnd(
-                () -> {
-                    intakeSubsystem.runMotor(
-                        driverXbox.getLeftTriggerAxis());
-                    conveyorSubsystem.runMotor(
-                        driverXbox.getLeftTriggerAxis());
-                },
-                () -> {
-                    intakeSubsystem.runMotor(0.0);
-                    conveyorSubsystem.runMotor(0.0);
-                },
-                intakeSubsystem));
+	// run indexer and conveyor
+	driverXbox
+		.leftTrigger(TRIGGER_DEADBAND)
+		.whileTrue(
+			Commands.runEnd(
+				() -> {
+					double power =
+						driverXbox
+							.getLeftTriggerAxis();
 
-    driverXbox
-        .button(6)
-        .whileTrue(
-            Commands.runOnce(
-                () -> drivebase.zeroGyro()
-            )
-        );
+					intakeSubsystem.runMotor(power);
+					conveyorSubsystem.runMotor(power);
 
-    driverXbox
-        .button(5)
-        .whileTrue(
-            Commands.runOnce(
-                () -> theStickSubsystem.sendCommand(6)
-            )
-        );
+					theStickSubsystem
+						.setIndexing(true);
+				},
+				() -> {
+					intakeSubsystem.runMotor(0.0);
+					conveyorSubsystem.runMotor(0.0);
 
-    /*
-     * Climber
-     *
-     * D-pad up: climb up
-     * D-pad down: climb down
-     */
-driverXbox
-    .povDown()
-    .whileTrue(
-        Commands.runEnd(
-            () -> climberSubsystem.runMotor(1.0),
-            climberSubsystem::stopMotor,
-            climberSubsystem));
+					theStickSubsystem
+						.setIndexing(false);
+				},
+				intakeSubsystem,
+				conveyorSubsystem));
 
-driverXbox
-    .povUp()
-    .whileTrue(
-        Commands.runEnd(
-            () -> climberSubsystem.runMotor(-1.0),
-            climberSubsystem::stopMotor,
-            climberSubsystem));
+	// climber down
+	driverXbox
+		.povDown()
+		.whileTrue(
+			Commands.runEnd(
+				() ->
+					climberSubsystem.runMotor(1.0),
+				climberSubsystem::stopMotor,
+				climberSubsystem));
 
-    /*
-     * Ball intake
-     *
-     * X: run ball intake
-     */
-    driverXbox
-        .x()
-        .whileTrue(
-            Commands.runEnd(
-                () ->
-                    ballIntakeSubsystem.runMotor(
-                        BALL_INTAKE_POWER),
-                () -> ballIntakeSubsystem.runMotor(0.0),
-                ballIntakeSubsystem));
+	// climber up
+	driverXbox
+		.povUp()
+		.whileTrue(
+			Commands.runEnd(
+				() ->
+					climberSubsystem.runMotor(-1.0),
+				climberSubsystem::stopMotor,
+				climberSubsystem));
 
-    /*
-     * Drivetrain utilities
-     *
-     * Start: reset field orientation
-     * Left bumper: lock swerve modules
-     */
-    driverXbox
-        .start()
-        .onTrue(
-            Commands.runOnce(
-                drivebase::zeroGyro,
-                drivebase));
+	// run the big ball intake
+	driverXbox
+		.x()
+		.whileTrue(
+			Commands.runEnd(
+				() -> {
+					ballIntakeSubsystem.runMotor(
+						BALL_INTAKE_POWER);
 
-    driverXbox
-        .leftBumper()
-        .whileTrue(
-            Commands.run(
-                drivebase::lock,
-                drivebase));
+					theStickSubsystem
+						.setIntaking(true);
+				},
+				() -> {
+					ballIntakeSubsystem.stopMotor();
 
-    driverXbox
-	.rightBumper()
-	.whileTrue(goToClosestPosition());
-  }
+					theStickSubsystem
+						.setIntaking(false);
+				},
+				ballIntakeSubsystem));
 
+	// reset field direction
+	driverXbox
+		.start()
+		.onTrue(
+			Commands.runOnce(
+				drivebase::zeroGyro,
+				drivebase));
 
-  
+	// lock the wheels
+	driverXbox
+		.leftBumper()
+		.whileTrue(
+			Commands.run(
+				drivebase::lock,
+				drivebase));
+
+	// go to closest shooting position
+	driverXbox
+		.rightBumper()
+		.whileTrue(
+			goToClosestPosition());
+}
+
   // Auto
   private void configureAutoSelector() {
 	autoChooser.setDefaultOption(

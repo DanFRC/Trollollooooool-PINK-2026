@@ -3,7 +3,6 @@ package frc.robot.subsystems.shooter;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.TalonSRX;
 import com.ctre.phoenix.motorcontrol.can.VictorSPX;
-
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
@@ -16,10 +15,21 @@ public class ShooterSubsystem extends SubsystemBase {
 	private static final int FOLLOWER_MOTOR_ID = 13;
 	private static final int BEAM_BREAK_CHANNEL = 0;
 
+	private static final double SENSOR_UNITS_PER_REVOLUTION =
+		8192.0;
+
 	private static final double MIN_DISTANCE_METERS = 0.0;
 	private static final double MAX_DISTANCE_METERS = 3.0;
 
+	// how close we need to be for the green light
+	private static final double RPM_TOLERANCE = 200.0;
+
+	// deliberate offset because the pid needs the extra push
+	private static final double RPM_OFFSET = 350.0;
+
 	private static final double STOPPED_THRESHOLD = 0.001;
+
+	// dashboard updates every 200ms instead of every 20ms
 	private static final int TELEMETRY_PERIOD_LOOPS = 10;
 
 	private static final String ACTION_KEY =
@@ -33,6 +43,9 @@ public class ShooterSubsystem extends SubsystemBase {
 
 	private static final String TARGET_RPM_KEY =
 		"Shooter/Target RPM";
+
+	private static final String PID_TARGET_RPM_KEY =
+		"Shooter/PID Target RPM";
 
 	private static final String TARGET_DISTANCE_KEY =
 		"Shooter/Target Distance";
@@ -59,24 +72,29 @@ public class ShooterSubsystem extends SubsystemBase {
 		new InterpolatingDoubleTreeMap();
 
 	private double powerPercentage = 1.0;
-	private double targetRPM;
-	private double targetDistanceMeters;
-	private double controllerOutput;
+
+	// actual rpm we want the wheel to reach
+	private double targetRPM = 0.0;
+
+	// target given to the pid including the +350
+	private double pidTargetRPM = 0.0;
+
+	private double targetDistanceMeters = 0.0;
+	private double controllerOutput = 0.0;
 
 	private double lastPublishedOutput = Double.NaN;
 	private String lastPublishedAction = "";
 
-	private int telemetryCounter;
+	private int telemetryCounter = 0;
 
 	public ShooterSubsystem() {
 		shooterMotor.setInverted(true);
 		shooterMotor.setSelectedSensorPosition(0);
 
+		// only needs to be configured once
 		followerMotor.follow(shooterMotor);
 
 		configureRPMInterpolation();
-
-		rpmController.setTolerance(75.0);
 
 		publishAction("Stopped");
 
@@ -86,7 +104,7 @@ public class ShooterSubsystem extends SubsystemBase {
 	}
 
 	private void configureRPMInterpolation() {
-
+		// temporary guesses until we test them properly
 		distanceToRPM.put(0.00, 2400.0);
 		distanceToRPM.put(0.25, 2550.0);
 		distanceToRPM.put(0.50, 2700.0);
@@ -100,16 +118,14 @@ public class ShooterSubsystem extends SubsystemBase {
 		distanceToRPM.put(3.00, 3700.0);
 	}
 
-	public double getTargetRPM(
-		double distanceMeters) {
-
-		double clampedDistance =
+	public double getTargetRPM(double distanceMeters) {
+		double safeDistance =
 			MathUtil.clamp(
 				distanceMeters,
 				MIN_DISTANCE_METERS,
 				MAX_DISTANCE_METERS);
 
-		return distanceToRPM.get(clampedDistance);
+		return distanceToRPM.get(safeDistance);
 	}
 
 	public void runMotorForDistance(
@@ -122,27 +138,49 @@ public class ShooterSubsystem extends SubsystemBase {
 				MAX_DISTANCE_METERS);
 
 		runMotorRPM(
-			getTargetRPM(targetDistanceMeters));
+			getTargetRPM(
+				targetDistanceMeters));
 	}
 
 	public void runMotorRPM(double requestedRPM) {
-		double newTargetRPM =
-			Math.max(0.0, requestedRPM);
+		double wantedRPM =
+			Math.max(
+				requestedRPM,
+				0.0);
 
-		if (Math.abs(newTargetRPM - targetRPM) > 1.0) {
-			targetRPM = newTargetRPM;
+		double wantedPIDTarget = 0.0;
+
+		if (wantedRPM > 0.0) {
+			wantedPIDTarget =
+				wantedRPM + RPM_OFFSET;
+		}
+
+		// only update the action if target changed
+		if (Math.abs(wantedRPM - targetRPM) > 1.0) {
+			targetRPM = wantedRPM;
+			pidTargetRPM = wantedPIDTarget;
 
 			publishAction(
 				String.format(
 					"Targeting %.0f RPM",
 					targetRPM));
+		} else {
+			pidTargetRPM = wantedPIDTarget;
+		}
+
+		if (targetRPM <= 0.0) {
+			stopMotor();
+			return;
 		}
 
 		controllerOutput =
+			rpmController.calculate(
+				getRPM(),
+				pidTargetRPM);
+
+		controllerOutput =
 			MathUtil.clamp(
-				rpmController.calculate(
-					getRPM(),
-					targetRPM),
+				controllerOutput,
 				-1.0,
 				1.0);
 
@@ -152,26 +190,28 @@ public class ShooterSubsystem extends SubsystemBase {
 	}
 
 	public void runMotor(double output) {
-		double clampedOutput =
+		double safeOutput =
 			MathUtil.clamp(
 				output,
 				-1.0,
 				1.0);
 
 		targetRPM = 0.0;
-		controllerOutput = clampedOutput;
+		pidTargetRPM = 0.0;
+		controllerOutput = safeOutput;
 
 		rpmController.reset();
 
 		shooterMotor.set(
 			ControlMode.PercentOutput,
-			clampedOutput);
+			safeOutput);
 
-		publishOutputState(clampedOutput);
+		publishOutputState(safeOutput);
 	}
 
 	public void stopMotor() {
 		targetRPM = 0.0;
+		pidTargetRPM = 0.0;
 		controllerOutput = 0.0;
 
 		rpmController.reset();
@@ -181,32 +221,41 @@ public class ShooterSubsystem extends SubsystemBase {
 			0.0);
 
 		publishAction("Stopped");
+
 		lastPublishedOutput = 0.0;
 	}
 
-  public double getRPM() {
-  	return shooterMotor
-	  .getSelectedSensorVelocity()
-		/ 8192
-		* 0.1
-		* 60
-		* 100;
-  }
+	public double getRPM() {
+		return shooterMotor
+			.getSelectedSensorVelocity()
+			/ SENSOR_UNITS_PER_REVOLUTION
+			* 0.1
+			* 60
+			* 100;
+	}
 
 	public double getEncoder() {
-		return shooterMotor.getSelectedSensorPosition();
+		return shooterMotor
+			.getSelectedSensorPosition();
 	}
 
 	public double getCurrentTargetRPM() {
 		return targetRPM;
 	}
 
-	public boolean atTargetRPM() {
+	public double getPIDTargetRPM() {
+		return pidTargetRPM;
+	}
+
+	public boolean isAtTargetRPM() {
 		return targetRPM > 0.0
-			&& rpmController.atSetpoint();
+			&& Math.abs(
+				getRPM() - targetRPM)
+					<= RPM_TOLERANCE;
 	}
 
 	public boolean isBeamBroken() {
+		// most beam breaks return false when blocked
 		return !beamBreak.get();
 	}
 
@@ -227,9 +276,11 @@ public class ShooterSubsystem extends SubsystemBase {
 	}
 
 	private void publishOutputState(double output) {
-		if (!Double.isNaN(lastPublishedOutput)
-			&& Math.abs(output - lastPublishedOutput)
-				< STOPPED_THRESHOLD) {
+		if (
+			!Double.isNaN(lastPublishedOutput)
+				&& Math.abs(
+					output - lastPublishedOutput)
+						< STOPPED_THRESHOLD) {
 
 			return;
 		}
@@ -241,12 +292,16 @@ public class ShooterSubsystem extends SubsystemBase {
 				String.format(
 					"Shooting at %.0f%%",
 					output * 100.0));
-		} else if (output < -STOPPED_THRESHOLD) {
+		}
+
+		else if (output < -STOPPED_THRESHOLD) {
 			publishAction(
 				String.format(
 					"Reversing at %.0f%%",
 					Math.abs(output) * 100.0));
-		} else {
+		}
+
+		else {
 			publishAction("Stopped");
 		}
 	}
@@ -265,7 +320,10 @@ public class ShooterSubsystem extends SubsystemBase {
 	public void periodic() {
 		telemetryCounter++;
 
-		if (telemetryCounter < TELEMETRY_PERIOD_LOOPS) {
+		if (
+			telemetryCounter
+				< TELEMETRY_PERIOD_LOOPS) {
+
 			return;
 		}
 
@@ -280,6 +338,10 @@ public class ShooterSubsystem extends SubsystemBase {
 			targetRPM);
 
 		SmartDashboard.putNumber(
+			PID_TARGET_RPM_KEY,
+			pidTargetRPM);
+
+		SmartDashboard.putNumber(
 			TARGET_DISTANCE_KEY,
 			targetDistanceMeters);
 
@@ -289,7 +351,7 @@ public class ShooterSubsystem extends SubsystemBase {
 
 		SmartDashboard.putBoolean(
 			"Shooter/At Target RPM",
-			atTargetRPM());
+			isAtTargetRPM());
 
 		SmartDashboard.putBoolean(
 			"Shooter/Beam Broken",
