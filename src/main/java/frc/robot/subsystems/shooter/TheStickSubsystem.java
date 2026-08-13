@@ -37,7 +37,7 @@ public class TheStickSubsystem extends SubsystemBase {
 			theStick =
 				new SerialPort(
 					9600,
-					SerialPort.Port.kUSB);
+					SerialPort.Port.kOnboard);
 
 			sendCommand(DISABLED_MODE);
 		} catch (Exception exception) {

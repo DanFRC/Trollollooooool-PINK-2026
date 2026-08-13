@@ -174,6 +174,7 @@ setupPathPlanner();
 	  vision.updatePoseEstimation(swerveDrive);
 
     m_field.setRobotPose(getPose());
+    SmartDashboard.putNumber("testing imu", swerveDrive.getYaw().getDegrees());
   }
 
   @Override
