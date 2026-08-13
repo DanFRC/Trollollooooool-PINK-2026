@@ -12,6 +12,7 @@ import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.path.PathConstraints;
+import com.pathplanner.lib.path.PathPlannerPath;
 import com.pathplanner.lib.util.DriveFeedforwards;
 import com.pathplanner.lib.util.swerve.SwerveSetpoint;
 import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
@@ -252,6 +253,38 @@ setupPathPlanner();
     // Create a path following command using AutoBuilder. This will also trigger event markers.
     return new PathPlannerAuto(pathName);
   }
+
+	/**
+	 * Pathfinds from the robots current pose to a PathPlanner path,
+	 * then follows the path without resetting odometry.
+	 *
+	 * @param pathName name of the path file from PathPlanner
+	 * @return start-anywhere path command
+	 */
+	public Command pathfindThenFollowPath(String pathName) {
+		try {
+			// load this now so auto doesnt do file work during the robot loop
+			PathPlannerPath path =
+				PathPlannerPath.fromPathFile(pathName);
+
+			PathConstraints constraints =
+				new PathConstraints(
+					2.0,
+					2.0,
+					Units.degreesToRadians(360.0),
+					Units.degreesToRadians(540.0));
+
+			return AutoBuilder.pathfindThenFollowPath(
+				path,
+				constraints);
+		} catch (Exception exception) {
+			DriverStation.reportError(
+				"Could not load PathPlanner path: " + pathName,
+				exception.getStackTrace());
+
+			return Commands.none();
+		}
+	}
 
   /**
    * Use PathPlanner Path finding to go to a point on the field.

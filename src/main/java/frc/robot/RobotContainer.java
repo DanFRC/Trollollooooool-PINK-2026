@@ -11,6 +11,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -499,13 +500,7 @@ private void configureBindings() {
 			goToClosestPosition());
 }
 
-private void configureAutoSelector() {
-	autoChooser.setDefaultOption(
-		"Open Intake",
-		Commands.runOnce(
-			ballIntakeSubsystem::openServo,
-			ballIntakeSubsystem));
-
+private Command createAimAndShootAuto() {
 	AimAtHopper autoAim =
 		new AimAtHopper(
 			drivebase,
@@ -604,13 +599,77 @@ private void configureAutoSelector() {
 				autoAim,
 				spinUpShooter));
 
+	return aimAndShoot;
+}
+
+private void configureAutoSelector() {
+	autoChooser.setDefaultOption(
+		"Do Nothing",
+		Commands.none());
+
 	autoChooser.addOption(
-		"lil shimmy auto",
-		aimAndShoot);
+		"Open Intake",
+		Commands.runOnce(
+			ballIntakeSubsystem::openServo,
+			ballIntakeSubsystem));
+
+	autoChooser.addOption(
+		"Aim And Shoot",
+		createAimAndShootAuto());
+
+	autoChooser.addOption(
+		"Start Anywhere - New Path Only",
+		drivebase.pathfindThenFollowPath(
+			"New Path"));
+
+	autoChooser.addOption(
+		"Start Anywhere - New Path + Shoot",
+		Commands.sequence(
+			drivebase.pathfindThenFollowPath(
+				"New Path"),
+			createAimAndShootAuto()));
 
 	SmartDashboard.putData(
 		"Autonomous Selector",
 		autoChooser);
+
+	if (RobotBase.isSimulation()) {
+		SmartDashboard.putData(
+			"Simulation/Set Start - Blue Upper",
+			Commands.runOnce(
+				() ->
+					drivebase.resetOdometry(
+						new Pose2d(
+							1.8,
+							6.7,
+							Rotation2d.fromDegrees(0.0))),
+				drivebase)
+					.ignoringDisable(true));
+
+		SmartDashboard.putData(
+			"Simulation/Set Start - Field Middle",
+			Commands.runOnce(
+				() ->
+					drivebase.resetOdometry(
+						new Pose2d(
+							8.0,
+							2.0,
+							Rotation2d.fromDegrees(90.0))),
+				drivebase)
+					.ignoringDisable(true));
+
+		SmartDashboard.putData(
+			"Simulation/Set Start - Red Lower",
+			Commands.runOnce(
+				() ->
+					drivebase.resetOdometry(
+						new Pose2d(
+							14.7,
+							1.3,
+							Rotation2d.fromDegrees(180.0))),
+				drivebase)
+					.ignoringDisable(true));
+	}
 }
 
 public Command getAutonomousCommand() {
