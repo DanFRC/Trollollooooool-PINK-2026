@@ -286,6 +286,27 @@ setupPathPlanner();
 		}
 	}
 
+	/**
+	 * Follows a path that starts where the previous path ended.
+	 *
+	 * @param pathName name of the path file from PathPlanner
+	 * @return normal path-following command
+	 */
+	public Command followPath(String pathName) {
+		try {
+			PathPlannerPath path =
+				PathPlannerPath.fromPathFile(pathName);
+
+			return AutoBuilder.followPath(path);
+		} catch (Exception exception) {
+			DriverStation.reportError(
+				"Could not load PathPlanner path: " + pathName,
+				exception.getStackTrace());
+
+			return Commands.none();
+		}
+	}
+
   /**
    * Use PathPlanner Path finding to go to a point on the field.
    *

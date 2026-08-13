@@ -4,6 +4,8 @@
 
 package frc.robot;
 
+import com.pathplanner.lib.util.FlippingUtil;
+import com.pathplanner.lib.events.EventTrigger;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -262,11 +264,11 @@ private Command goToClosestPosition() {
               drivebase.getSwerveDrive(),
               () -> -driverXbox.getLeftY(),
               () -> -driverXbox.getLeftX())
-          .withControllerRotationAxis(
-              () -> -driverXbox.getRightX())
-          .deadband(OperatorConstants.DEADBAND)
-          .scaleTranslation(0.8)
-          .allianceRelativeControl(true);
+		  .withControllerRotationAxis(
+			  () -> -driverXbox.getRightX())
+		  .deadband(OperatorConstants.DEADBAND)
+		  .scaleTranslation(0.8)
+		  .allianceRelativeControl(true);
 
   public RobotContainer() {
     DriverStation.silenceJoystickConnectionWarning(true);
@@ -287,8 +289,47 @@ private Command goToClosestPosition() {
 
     configureBindings();
 
+	configurePathPlannerEvents();
+
     configureAutoSelector();
   }
+
+private void startAutoIntake() {
+	ballIntakeSubsystem.openServo();
+	ballIntakeSubsystem.runMotor(BALL_INTAKE_POWER);
+	intakeSubsystem.runMotor(1.0);
+	conveyorSubsystem.runMotor(1.0);
+
+	theStickSubsystem.setIntaking(true);
+	theStickSubsystem.setIndexing(true);
+}
+
+private void stopAutoIntake() {
+	ballIntakeSubsystem.stopMotor();
+	intakeSubsystem.runMotor(0.0);
+	conveyorSubsystem.runMotor(0.0);
+
+	theStickSubsystem.setIntaking(false);
+	theStickSubsystem.setIndexing(false);
+}
+
+private void configurePathPlannerEvents() {
+	new EventTrigger("START_INTAKE")
+		.onTrue(
+			Commands.runOnce(
+				this::startAutoIntake,
+				ballIntakeSubsystem,
+				intakeSubsystem,
+				conveyorSubsystem));
+
+	new EventTrigger("STOP_INTAKE")
+		.onTrue(
+			Commands.runOnce(
+				this::stopAutoIntake,
+				ballIntakeSubsystem,
+				intakeSubsystem,
+				conveyorSubsystem));
+}
 
 private void configureBindings() {
 	Trigger teleopEnabled =
@@ -633,10 +674,22 @@ private Command createAimAndShootAuto() {
 	return aimAndShoot;
 }
 
+private Pose2d getAllianceStartPose(Pose2d bluePose) {
+	boolean isRed =
+		DriverStation
+			.getAlliance()
+			.orElse(Alliance.Blue)
+				== Alliance.Red;
+
+	return isRed
+		? FlippingUtil.flipFieldPose(bluePose)
+		: bluePose;
+}
+
 private void configureAutoSelector() {
 	autoChooser.setDefaultOption(
 		"Do Nothing",
-		Commands.none());
+		Commands.runOnce(()->ballIntakeSubsystem.openServo()));
 
 	autoChooser.addOption(
 		"Open Intake",
@@ -646,53 +699,79 @@ private void configureAutoSelector() {
 
 	autoChooser.addOption(
 		"Aim And Shoot",
-		createAimAndShootAuto());
+		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
+			createAimAndShootAuto()));
+		
+
+	autoChooser.addOption(
+		"FULL BALL AUTO + SHOOT",
+		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
+			// start wherever vision says we are
+			drivebase.pathfindThenFollowPath(
+				"GO_FRONT_HOPPER"),
+
+			// grab balls then return to our zone
+			drivebase.followPath(
+				"HOPPER_TO_BALLS_BACK_TO_ZONE"),
+
+			// line up and shoot after the path finishes
+			createAimAndShootAuto())
+				.finallyDo(
+					interrupted ->
+						stopAutoIntake()));
 
 	SmartDashboard.putData(
 		"Autonomous Selector",
 		autoChooser);
 
-	if (RobotBase.isSimulation()) {
-		SmartDashboard.putData(
-			"Simulation/Set Start - Blue Upper",
+	SmartDashboard.putData(
+			"Auto/Set Start - LEFT",
 			Commands.runOnce(
 				() ->
 					drivebase.resetOdometry(
-						new Pose2d(
-							1.8,
-							6.7,
-							Rotation2d.fromDegrees(0.0))),
+						getAllianceStartPose(
+							new Pose2d(
+								4.0,
+								7.425,
+								Rotation2d.fromDegrees(0.0)))),
 				drivebase)
 					.ignoringDisable(true));
 
-		SmartDashboard.putData(
-			"Simulation/Set Start - Field Middle",
+	SmartDashboard.putData(
+			"Auto/Set Start - MIDDLE",
 			Commands.runOnce(
 				() ->
 					drivebase.resetOdometry(
-						new Pose2d(
-							8.0,
-							2.0,
-							Rotation2d.fromDegrees(90.0))),
+						getAllianceStartPose(
+							new Pose2d(
+								3.5,
+								4.0,
+								Rotation2d.fromDegrees(0.0)))),
 				drivebase)
 					.ignoringDisable(true));
 
-		SmartDashboard.putData(
-			"Simulation/Set Start - Red Lower",
+	SmartDashboard.putData(
+			"Auto/Set Start - RIGHT",
 			Commands.runOnce(
 				() ->
 					drivebase.resetOdometry(
-						new Pose2d(
-							14.7,
-							1.3,
-							Rotation2d.fromDegrees(180.0))),
+						getAllianceStartPose(
+							new Pose2d(
+								4.0,
+								0.65,
+								Rotation2d.fromDegrees(0.0)))),
 				drivebase)
 					.ignoringDisable(true));
-	}
 }
 
 public Command getAutonomousCommand() {
 	return autoChooser.getSelected();
+}
+
+public void stopDrive() {
+	drivebase.drive(new ChassisSpeeds());
 }
 
 public void setMotorBrake(boolean brake) {

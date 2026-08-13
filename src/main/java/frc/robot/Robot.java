@@ -78,6 +78,11 @@ public class Robot extends TimedRobot
   @Override
   public void disabledInit()
   {
+    // kill auto and clear its last drive request as soon as we disable
+    CommandScheduler.getInstance().cancelAll();
+    m_autonomousCommand = null;
+    m_robotContainer.stopDrive();
+
     m_robotContainer.setMotorBrake(true);
     disabledTimer.reset();
     disabledTimer.start();
