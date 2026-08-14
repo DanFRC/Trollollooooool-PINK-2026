@@ -45,7 +45,7 @@ public final class Vision {
 		VecBuilder.fill(
 			0.4,
 			0.4,
-			0.8);
+			Double.MAX_VALUE);
 
 	private static final Transform3d ROBOT_TO_FRONT_RIGHT =
 		createTransform(
@@ -72,7 +72,7 @@ public final class Vision {
 			0.260,
 			0.0,
 			0.0,
-			135.0);
+			-135.0);
 
 	private static final Transform3d ROBOT_TO_BACK_LEFT =
 		createTransform(
@@ -81,7 +81,7 @@ public final class Vision {
 			0.260,
 			0.0,
 			0.0,
-			-135.0);
+			135.0);
 
 	private record CameraConfig(
 		String name,

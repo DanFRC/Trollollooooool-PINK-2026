@@ -41,6 +41,10 @@ public class AimAtHopper extends Command {
 	private static final double SHOOTER_DIRECTION_OFFSET_DEGREES =
 		0.0;
 
+	// lol more = more angle at movement, less = less angle at movement
+	private static final double MAX_FLIGHT_TIME =
+		1.5;
+
 	private final SwerveSubsystem drivebase;
 
 	private final DoubleSupplier translationXSupplier;
@@ -150,7 +154,7 @@ public class AimAtHopper extends Command {
 			MathUtil.clamp(
 				flightTime,
 				0.0,
-				0.75);
+				MAX_FLIGHT_TIME);
 
 		// fuel keeps some of the robots movement when it leaves
 		Translation2d movementOffset =
