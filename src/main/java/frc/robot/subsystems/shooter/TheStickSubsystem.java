@@ -15,6 +15,8 @@ public class TheStickSubsystem extends SubsystemBase {
 	private static final String GREEN_FLICKER = "g";
     private static final String DISABLED_MODE = "3";
     private static final String POLICE_MODE = "p";
+	private static final String HEARTBEAT = "h";
+	private static final int HEARTBEAT_PERIOD_LOOPS = 10;
 
 	private final BooleanSupplier shooterReady;
 
@@ -26,6 +28,9 @@ public class TheStickSubsystem extends SubsystemBase {
     private boolean shuttling = false;
 
 	private String currentCommand = "";
+	private int heartbeatCounter = 0;
+	private boolean wasDSAttached = false;
+	private boolean serialWarningSent = false;
 
 	public TheStickSubsystem(
 		BooleanSupplier shooterReady) {
@@ -72,6 +77,22 @@ public class TheStickSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
+		boolean dsAttached =
+			DriverStation.isDSAttached();
+
+		// stop talking so the arduino watchdog can show lost comms
+		if (!dsAttached) {
+			wasDSAttached = false;
+			heartbeatCounter = 0;
+			return;
+		}
+
+		// resend the wanted mode as soon as comms come back
+		if (!wasDSAttached) {
+			currentCommand = "";
+			wasDSAttached = true;
+		}
+
         String wantedCommand;
 
         // blue whenever robot is disabled
@@ -107,6 +128,13 @@ public class TheStickSubsystem extends SubsystemBase {
         }
 
         sendCommand(wantedCommand);
+
+		heartbeatCounter++;
+
+		if (heartbeatCounter >= HEARTBEAT_PERIOD_LOOPS) {
+			heartbeatCounter = 0;
+			writeToStick(HEARTBEAT);
+		}
     }
 
     private String getModeName(String command) {
@@ -147,14 +175,31 @@ public class TheStickSubsystem extends SubsystemBase {
             return;
         }
 
-        currentCommand = command;
+		currentCommand = command;
 
-        if (theStick != null) {
-            theStick.writeString(command);
-        }
+		writeToStick(command);
 
         SmartDashboard.putString(
-            "LED/Current Status",
-            getModeName(command));
-    }
+			"LED/Current Status",
+			getModeName(command));
+	}
+
+	private void writeToStick(String data) {
+		if (theStick == null) {
+			return;
+		}
+
+		try {
+			theStick.writeString(data);
+			serialWarningSent = false;
+		} catch (Exception exception) {
+			if (!serialWarningSent) {
+				DriverStation.reportWarning(
+					"LED arduino serial connection lost",
+					false);
+
+				serialWarningSent = true;
+			}
+		}
+	}
 }

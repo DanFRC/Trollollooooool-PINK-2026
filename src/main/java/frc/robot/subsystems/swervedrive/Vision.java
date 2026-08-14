@@ -13,7 +13,10 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.photonvision.EstimatedRobotPose;
@@ -92,6 +95,22 @@ public final class Vision {
 		String cameraName,
 		EstimatedRobotPose estimate) {}
 
+	private record CameraDiagnostics(
+		Pose3d pose,
+		int tagCount,
+		double ambiguity,
+		double averageDistanceMeters,
+		String result) {}
+
+	private enum RejectionReason {
+		NO_POSE_ESTIMATE,
+		OUTSIDE_FIELD,
+		HEIGHT,
+		NO_TARGETS,
+		AMBIGUITY,
+		DISTANCE
+	}
+
 	private final List<CameraConfig> cameras =
 		List.of(
 			createCamera(
@@ -115,6 +134,15 @@ public final class Vision {
 	private int telemetryCounter;
 	private int acceptedMeasurements;
 	private int rejectedMeasurements;
+
+	private final Map<String, CameraDiagnostics> cameraDiagnostics =
+		new HashMap<>();
+
+	private final Map<RejectionReason, Integer> rejectionCounts =
+		new EnumMap<>(RejectionReason.class);
+
+	private String latestRejectionReason =
+		"None";
 
 	private Pose2d latestVisionPose =
 		new Pose2d();
@@ -230,14 +258,28 @@ public final class Vision {
 		}
 
 		if (estimate.isEmpty()) {
-			rejectedMeasurements++;
+			recordRejection(
+				cameraConfig.name(),
+				RejectionReason.NO_POSE_ESTIMATE);
+
 			return Optional.empty();
 		}
 
-		if (!isMeasurementValid(estimate.get())) {
-			rejectedMeasurements++;
+		updateCameraDiagnostics(
+			cameraConfig.name(),
+			estimate.get(),
+			"Checking");
+
+		if (!isMeasurementValid(
+			cameraConfig.name(),
+			estimate.get())) {
+
 			return Optional.empty();
 		}
+
+		setCameraResult(
+			cameraConfig.name(),
+			"Accepted");
 
 		return Optional.of(
 			new VisionMeasurement(
@@ -268,56 +310,163 @@ public final class Vision {
 	}
 
 	private boolean isMeasurementValid(
+		String cameraName,
 		EstimatedRobotPose measurement) {
+		Pose3d pose3d =
+			measurement.estimatedPose;
+
+		Pose2d pose2d =
+			pose3d.toPose2d();
+
+		boolean insideField =
+			pose2d.getX() >= 0.0
+				&& pose2d.getX()
+					<= FIELD_LAYOUT.getFieldLength()
+				&& pose2d.getY() >= 0.0
+				&& pose2d.getY()
+					<= FIELD_LAYOUT.getFieldWidth();
+
+		if (!insideField) {
+			recordRejection(
+				cameraName,
+				RejectionReason.OUTSIDE_FIELD);
+
+			return false;
+		}
+
+		if (Math.abs(pose3d.getZ())
+			> MAX_POSE_HEIGHT_ERROR_METERS) {
+
+			recordRejection(
+				cameraName,
+				RejectionReason.HEIGHT);
+
+			return false;
+		}
+
+		if (measurement.targetsUsed.isEmpty()) {
+			recordRejection(
+				cameraName,
+				RejectionReason.NO_TARGETS);
+
+			return false;
+		}
+
+		if (measurement.targetsUsed.size() > 1) {
 			return true;
-		// Pose3d pose3d =
-		// 	measurement.estimatedPose;
+		}
 
-		// Pose2d pose2d =
-		// 	pose3d.toPose2d();
+		PhotonTrackedTarget target =
+			measurement.targetsUsed.get(0);
 
-		// boolean insideField =
-		// 	pose2d.getX() >= 0.0
-		// 		&& pose2d.getX()
-		// 			<= FIELD_LAYOUT.getFieldLength()
-		// 		&& pose2d.getY() >= 0.0
-		// 		&& pose2d.getY()
-		// 			<= FIELD_LAYOUT.getFieldWidth();
+		double ambiguity =
+			target.getPoseAmbiguity();
 
-		// if (!insideField) {
-		// 	return false;
-		// }
+		if (ambiguity < 0.0
+			|| ambiguity > MAX_SINGLE_TAG_AMBIGUITY) {
 
-		// if (Math.abs(pose3d.getZ())
-		// 	> MAX_POSE_HEIGHT_ERROR_METERS) {
+			recordRejection(
+				cameraName,
+				RejectionReason.AMBIGUITY);
 
-		// 	return false;
-		// }
+			return false;
+		}
 
-		// if (measurement.targetsUsed.isEmpty()) {
-		// 	return false;
-		// }
+		double distance =
+			target
+				.getBestCameraToTarget()
+				.getTranslation()
+				.getNorm();
 
-		// if (measurement.targetsUsed.size() > 1) {
-		// 	return true;
-		// }
+		if (distance
+			> MAX_SINGLE_TAG_DISTANCE_METERS) {
 
-		// PhotonTrackedTarget target =
-		// 	measurement.targetsUsed.get(0);
+			recordRejection(
+				cameraName,
+				RejectionReason.DISTANCE);
 
-		// double ambiguity =
-		// 	target.getPoseAmbiguity();
+			return false;
+		}
 
-		// double distance =
-		// 	target
-		// 		.getBestCameraToTarget()
-		// 		.getTranslation()
-		// 		.getNorm();
+		return true;
+	}
 
-		// return ambiguity >= 0.0
-		// 	&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
-		// 	&& distance
-		// 		<= MAX_SINGLE_TAG_DISTANCE_METERS;
+	private void updateCameraDiagnostics(
+		String cameraName,
+		EstimatedRobotPose measurement,
+		String result) {
+
+		int tagCount =
+			measurement.targetsUsed.size();
+
+		double ambiguity =
+			tagCount == 1
+				? measurement.targetsUsed
+					.get(0)
+					.getPoseAmbiguity()
+				: -1.0;
+
+		double averageDistance =
+			measurement.targetsUsed.stream()
+				.mapToDouble(
+					target ->
+						target
+							.getBestCameraToTarget()
+							.getTranslation()
+							.getNorm())
+				.average()
+				.orElse(Double.NaN);
+
+		cameraDiagnostics.put(
+			cameraName,
+			new CameraDiagnostics(
+				measurement.estimatedPose,
+				tagCount,
+				ambiguity,
+				averageDistance,
+				result));
+	}
+
+	private void setCameraResult(
+		String cameraName,
+		String result) {
+
+		CameraDiagnostics diagnostics =
+			cameraDiagnostics.get(cameraName);
+
+		if (diagnostics == null) {
+			return;
+		}
+
+		cameraDiagnostics.put(
+			cameraName,
+			new CameraDiagnostics(
+				diagnostics.pose(),
+				diagnostics.tagCount(),
+				diagnostics.ambiguity(),
+				diagnostics.averageDistanceMeters(),
+				result));
+	}
+
+	private void recordRejection(
+		String cameraName,
+		RejectionReason reason) {
+
+		rejectedMeasurements++;
+
+		rejectionCounts.merge(
+			reason,
+			1,
+			Integer::sum);
+
+		latestRejectionReason =
+			cameraName
+				+ ": "
+				+ reason.name();
+
+		setCameraResult(
+			cameraName,
+			"Rejected: " + reason.name());
 	}
 
 	private Matrix<N3, N1> calculateStandardDeviations(
@@ -379,6 +528,63 @@ public final class Vision {
 					+ cameraConfig.name()
 					+ "/Connected",
 				connected);
+
+			CameraDiagnostics diagnostics =
+				cameraDiagnostics.get(
+					cameraConfig.name());
+
+			if (diagnostics != null) {
+				String key =
+					"Vision/"
+						+ cameraConfig.name();
+
+				SmartDashboard.putNumber(
+					key + "/Candidate X",
+					diagnostics.pose().getX());
+
+				SmartDashboard.putNumber(
+					key + "/Candidate Y",
+					diagnostics.pose().getY());
+
+				SmartDashboard.putNumber(
+					key + "/Candidate Z",
+					diagnostics.pose().getZ());
+
+				SmartDashboard.putNumber(
+					key + "/Candidate Heading",
+					diagnostics
+						.pose()
+						.getRotation()
+						.toRotation2d()
+						.getDegrees());
+
+				SmartDashboard.putNumber(
+					key + "/Tag Count",
+					diagnostics.tagCount());
+
+				SmartDashboard.putNumber(
+					key + "/Ambiguity",
+					diagnostics.ambiguity());
+
+				SmartDashboard.putNumber(
+					key + "/Average Tag Distance",
+					diagnostics.averageDistanceMeters());
+
+				SmartDashboard.putString(
+					key + "/Result",
+					diagnostics.result());
+			}
+		}
+
+		for (RejectionReason reason :
+			RejectionReason.values()) {
+
+			SmartDashboard.putNumber(
+				"Vision/Rejected/"
+					+ reason.name(),
+				rejectionCounts.getOrDefault(
+					reason,
+					0));
 		}
 
 		SmartDashboard.putNumber(
@@ -408,6 +614,10 @@ public final class Vision {
 		SmartDashboard.putNumber(
 			"Vision/Rejected Measurements",
 			rejectedMeasurements);
+
+		SmartDashboard.putString(
+			"Vision/Latest Rejection",
+			latestRejectionReason);
 
 		SmartDashboard.putNumber(
 			"Vision/Field X",

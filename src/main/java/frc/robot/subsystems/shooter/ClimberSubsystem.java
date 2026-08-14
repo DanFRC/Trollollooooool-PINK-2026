@@ -16,7 +16,7 @@ import frc.robot.Constants.DrivebaseConstants;
 public class ClimberSubsystem extends SubsystemBase {
   private static final int CLIMBER_MOTOR_ID = 15;
   private static final int SERVO_ID = 1;
-  private static final double SERVO_START_POINT = 0;
+  private static final double SERVO_OPEN_POINT = 1.0;
 
   private static final int ENCODER_CHANNEL_A = 5;
   private static final int ENCODER_CHANNEL_B = 6;
@@ -47,6 +47,7 @@ public class ClimberSubsystem extends SubsystemBase {
 
   public ClimberSubsystem() {
     positionEncoder.reset();
+    climberServo.set(SERVO_OPEN_POINT);
   }
 
   @Override
@@ -107,14 +108,6 @@ public class ClimberSubsystem extends SubsystemBase {
     climberMotor.set(
         ControlMode.PercentOutput,
         0.0);
-  }
-
-  public void openServo(double speed) {
-    climberServo.set(speed);
-  }
-
-  public void stopServo() {
-    climberServo.set(SERVO_START_POINT);
   }
 
   public double getPosition() {

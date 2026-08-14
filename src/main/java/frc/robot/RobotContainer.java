@@ -50,6 +50,7 @@ public class RobotContainer {
 
     private static final double INTAKE_SHIMMY_SPEED = 0.6;
     private static final double INTAKE_SHIMMY_TIME = 0.15;
+	private boolean pathShootingEnabled = false;
 
     // Aimer stuff
     private static final double SHUTTLE_ZONE_MIN_X = 5.0;
@@ -58,8 +59,8 @@ public class RobotContainer {
     private static final double BLUE_SHUTTLE_X = 3.2;
     private static final double RED_SHUTTLE_X = 13.25;
 
-    private static final double LOWER_SHUTTLE_Y = 1.65;
-    private static final double UPPER_SHUTTLE_Y = 6.45;
+    private static final double LOWER_SHUTTLE_Y = 2.65;
+    private static final double UPPER_SHUTTLE_Y = 5.45;
     private static final double FIELD_MIDDLE_Y = 4.0345;
     // dont feed until shooter gets here
     private static final double SHUTTLE_READY_RPM = 3000.0;
@@ -112,10 +113,17 @@ public class RobotContainer {
     }
 
     private double getDistanceToHub() {
-    	return drivebase
+	double distanceMeters =
+		drivebase
     		.getPose()
     		.getTranslation()
 	    	.getDistance(getAllianceHub());
+
+	SmartDashboard.putNumber(
+		"Shooter/Distance To Alliance Hopper",
+		distanceMeters);
+
+	return distanceMeters;
     }
 
 
@@ -321,6 +329,46 @@ private void stopAutoIntake() {
 	theStickSubsystem.setIndexing(false);
 }
 
+private Command createPathShootingCommand() {
+	return Commands.runEnd(
+		() -> {
+			shooterSubsystem.runMotorForDistance(
+				getDistanceToHub());
+
+			theStickSubsystem.setShooterRunning(true);
+
+			boolean shooterReady =
+				RobotBase.isSimulation()
+					|| shooterSubsystem.isAtTargetRPM();
+
+			if (shooterReady) {
+				intakeSubsystem.runMotor(AUTO_FEED_POWER);
+				conveyorSubsystem.runMotor(AUTO_FEED_POWER);
+
+				theStickSubsystem.setIndexing(true);
+			} else {
+				intakeSubsystem.runMotor(0.0);
+				conveyorSubsystem.runMotor(0.0);
+
+				theStickSubsystem.setIndexing(false);
+			}
+		},
+		this::stopPathShooting)
+			.until(
+				() -> !pathShootingEnabled);
+}
+
+private void stopPathShooting() {
+	pathShootingEnabled = false;
+
+	shooterSubsystem.stopMotor();
+	intakeSubsystem.runMotor(0.0);
+	conveyorSubsystem.runMotor(0.0);
+
+	theStickSubsystem.setShooterRunning(false);
+	theStickSubsystem.setIndexing(false);
+}
+
 private void configurePathPlannerEvents() {
 	new EventTrigger("START_INTAKE")
 		.onTrue(
@@ -331,6 +379,18 @@ private void configurePathPlannerEvents() {
 		.onTrue(
 			Commands.runOnce(
 				this::stopAutoIntake));
+
+	new EventTrigger("START_SHOOTING")
+		.onTrue(
+			Commands.sequence(
+				Commands.runOnce(
+					() -> pathShootingEnabled = true),
+				createPathShootingCommand()));
+
+	new EventTrigger("STOP_SHOOTING")
+		.onTrue(
+			Commands.runOnce(
+				this::stopPathShooting));
 }
 
 private void configureBindings() {
@@ -550,6 +610,7 @@ private void configureBindings() {
 	driverXbox
 		.leftTrigger(TRIGGER_DEADBAND)
 		.and(teleopEnabled)
+		.and(rightTrigger.negate())
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
@@ -622,7 +683,7 @@ private void configureBindings() {
 		.and(teleopEnabled)
 		.onTrue(
 			Commands.runOnce(
-				drivebase::zeroGyro,
+				drivebase::zeroGyroWithAlliance,
 				drivebase));
 
 	// lock the wheels
@@ -784,6 +845,22 @@ private void configureAutoSelector() {
 		Commands.sequence(
 			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
 			createAimAndShootAuto()));
+
+	autoChooser.addOption(
+		"MIDDLE AUTO",
+		Commands.sequence(
+			drivebase.pathfindThenFollowPath(
+				"MIDDLE_AUTO"),
+
+			createAimAndShootAuto(1.5),
+
+			drivebase.followPath(
+				"MIDDLE_AUTO_HUMAN_PLAYER"))
+				.finallyDo(
+					interrupted -> {
+						stopAutoIntake();
+						stopPathShooting();
+					}));
 		
 
 	autoChooser.addOption(
@@ -794,9 +871,6 @@ private void configureAutoSelector() {
 			drivebase.pathfindThenFollowPath(
 				"GO_FRONT_HOPPER"),
 
-			// shoot the preload before leaving the hopper
-			createAimAndShootAuto(1.5),
-
 			// grab balls then return to our zone
 			drivebase.followPath(
 				"HOPPER_TO_BALLS_BACK_TO_ZONE"),
@@ -804,8 +878,10 @@ private void configureAutoSelector() {
 			// line up and shoot after the path finishes
 			createAimAndShootAuto())
 				.finallyDo(
-					interrupted ->
-						stopAutoIntake()));
+					interrupted -> {
+						stopAutoIntake();
+						stopPathShooting();
+					}));
 
 	SmartDashboard.putData(
 		"Autonomous Selector",
