@@ -22,10 +22,10 @@ public class ShooterSubsystem extends SubsystemBase {
 	private static final double MAX_DISTANCE_METERS = 3.0;
 
 	// how close we need to be for the green light
-	private static final double RPM_TOLERANCE = 200.0;
+	private static final double RPM_TOLERANCE = 450.0;
 
 	// deliberate offset because the pid needs the extra push
-	private static final double RPM_OFFSET = 350.0;
+	private static final double RPM_OFFSET = 0.0;
 
 	private static final double STOPPED_THRESHOLD = 0.001;
 
@@ -104,18 +104,18 @@ public class ShooterSubsystem extends SubsystemBase {
 	}
 
 	private void configureRPMInterpolation() {
-		// temporary guesses until we test them properly
-		distanceToRPM.put(0.00, 2400.0);
-		distanceToRPM.put(0.25, 2550.0);
-		distanceToRPM.put(0.50, 2700.0);
-		distanceToRPM.put(0.75, 2800.0);
-		distanceToRPM.put(1.00, 2900.0);
-		distanceToRPM.put(1.25, 3000.0);
-		distanceToRPM.put(1.50, 3100.0);
-		distanceToRPM.put(1.75, 3200.0);
-		distanceToRPM.put(2.00, 3300.0);
-		distanceToRPM.put(2.50, 3500.0);
-		distanceToRPM.put(3.00, 3700.0);
+		// temporary guesses until we test them properly WE TESTED THEM!!
+		distanceToRPM.put(0.00, 2475.0);
+		distanceToRPM.put(0.25, 2475.0);
+		distanceToRPM.put(0.50, 2475.0);
+		distanceToRPM.put(0.75, 2552.5);
+		distanceToRPM.put(1.00, 2630.0);
+		distanceToRPM.put(1.25, 2790.0);
+		distanceToRPM.put(1.50, 2850.0);
+		distanceToRPM.put(1.75, 3065.0);
+		distanceToRPM.put(2.00, 3180.0);
+		distanceToRPM.put(2.50, 3339.0);
+		distanceToRPM.put(3.00, 3610.0);
 	}
 
 	public double getTargetRPM(double distanceMeters) {

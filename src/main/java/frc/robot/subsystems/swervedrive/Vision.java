@@ -33,7 +33,7 @@ public final class Vision {
 
 	private static final AprilTagFieldLayout FIELD_LAYOUT =
 		AprilTagFieldLayout.loadField(
-			AprilTagFields.kDefaultField);
+			AprilTagFields.k2026RebuiltWelded);
 
 	private static final Matrix<N3, N1> SINGLE_TAG_STD_DEVS =
 		VecBuilder.fill(
@@ -49,36 +49,36 @@ public final class Vision {
 
 	private static final Transform3d ROBOT_TO_FRONT_RIGHT =
 		createTransform(
-			0.0,
-			0.0,
-			0.0,
-			0.0,
-			0.0,
-			45.0);
-
-	private static final Transform3d ROBOT_TO_FRONT_LEFT =
-		createTransform(
-			0.0,
-			0.0,
-			0.0,
+			0.47,
+			-0.21,
+			0.275,
 			0.0,
 			0.0,
 			-45.0);
 
+	private static final Transform3d ROBOT_TO_FRONT_LEFT =
+		createTransform(
+			0.47,
+			0.21,
+			0.275,
+			0.0,
+			0.0,
+			45);
+
 	private static final Transform3d ROBOT_TO_BACK_RIGHT =
 		createTransform(
-			0.0,
-			0.0,
-			0.0,
+			-0.38,
+			-0.21,
+			0.260,
 			0.0,
 			0.0,
 			135.0);
 
 	private static final Transform3d ROBOT_TO_BACK_LEFT =
 		createTransform(
-			0.0,
-			0.0,
-			0.0,
+			-0.38,
+			0.21,
+			0.260,
 			0.0,
 			0.0,
 			-135.0);
@@ -269,55 +269,55 @@ public final class Vision {
 
 	private boolean isMeasurementValid(
 		EstimatedRobotPose measurement) {
-
-		Pose3d pose3d =
-			measurement.estimatedPose;
-
-		Pose2d pose2d =
-			pose3d.toPose2d();
-
-		boolean insideField =
-			pose2d.getX() >= 0.0
-				&& pose2d.getX()
-					<= FIELD_LAYOUT.getFieldLength()
-				&& pose2d.getY() >= 0.0
-				&& pose2d.getY()
-					<= FIELD_LAYOUT.getFieldWidth();
-
-		if (!insideField) {
-			return false;
-		}
-
-		if (Math.abs(pose3d.getZ())
-			> MAX_POSE_HEIGHT_ERROR_METERS) {
-
-			return false;
-		}
-
-		if (measurement.targetsUsed.isEmpty()) {
-			return false;
-		}
-
-		if (measurement.targetsUsed.size() > 1) {
 			return true;
-		}
+		// Pose3d pose3d =
+		// 	measurement.estimatedPose;
 
-		PhotonTrackedTarget target =
-			measurement.targetsUsed.get(0);
+		// Pose2d pose2d =
+		// 	pose3d.toPose2d();
 
-		double ambiguity =
-			target.getPoseAmbiguity();
+		// boolean insideField =
+		// 	pose2d.getX() >= 0.0
+		// 		&& pose2d.getX()
+		// 			<= FIELD_LAYOUT.getFieldLength()
+		// 		&& pose2d.getY() >= 0.0
+		// 		&& pose2d.getY()
+		// 			<= FIELD_LAYOUT.getFieldWidth();
 
-		double distance =
-			target
-				.getBestCameraToTarget()
-				.getTranslation()
-				.getNorm();
+		// if (!insideField) {
+		// 	return false;
+		// }
 
-		return ambiguity >= 0.0
-			&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
-			&& distance
-				<= MAX_SINGLE_TAG_DISTANCE_METERS;
+		// if (Math.abs(pose3d.getZ())
+		// 	> MAX_POSE_HEIGHT_ERROR_METERS) {
+
+		// 	return false;
+		// }
+
+		// if (measurement.targetsUsed.isEmpty()) {
+		// 	return false;
+		// }
+
+		// if (measurement.targetsUsed.size() > 1) {
+		// 	return true;
+		// }
+
+		// PhotonTrackedTarget target =
+		// 	measurement.targetsUsed.get(0);
+
+		// double ambiguity =
+		// 	target.getPoseAmbiguity();
+
+		// double distance =
+		// 	target
+		// 		.getBestCameraToTarget()
+		// 		.getTranslation()
+		// 		.getNorm();
+
+		// return ambiguity >= 0.0
+		// 	&& ambiguity <= MAX_SINGLE_TAG_AMBIGUITY
+		// 	&& distance
+		// 		<= MAX_SINGLE_TAG_DISTANCE_METERS;
 	}
 
 	private Matrix<N3, N1> calculateStandardDeviations(
