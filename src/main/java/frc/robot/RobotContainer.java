@@ -48,6 +48,7 @@ public class RobotContainer {
     private static final double AUTO_SHOOT_TIMEOUT = 4.0;
     private static final double AUTO_FEED_TIME = 2.0;
     private static final double AUTO_FEED_POWER = 1.0;
+	private static final double SIMULATED_CLIMBER_MOVE_TIME = 3.5;
 
     private static final double INTAKE_SHIMMY_SPEED = 0.6;
     private static final double INTAKE_SHIMMY_TIME = 0.15;
@@ -763,9 +764,26 @@ private Command createAimAndShootAutoNoShake(
 		false);
 }
 
+private Command createAimAndShootAutoNoShakeUntilInterrupted() {
+	return createAimAndShootAuto(
+		0.0,
+		false,
+		false);
+}
+
 private Command createAimAndShootAuto(
 	double feedTimeSeconds,
 	boolean shakeBeforeShooting) {
+	return createAimAndShootAuto(
+		feedTimeSeconds,
+		shakeBeforeShooting,
+		true);
+}
+
+private Command createAimAndShootAuto(
+	double feedTimeSeconds,
+	boolean shakeBeforeShooting,
+	boolean stopAfterFeedTime) {
 	AimAtHopper autoAim =
 		new AimAtHopper(
 			drivebase,
@@ -825,9 +843,13 @@ private Command createAimAndShootAuto(
 					.setIndexing(false);
 			},
 			intakeSubsystem,
-			conveyorSubsystem)
-				.withTimeout(
-					feedTimeSeconds);
+			conveyorSubsystem);
+
+	if (stopAfterFeedTime) {
+		feedBalls =
+			feedBalls.withTimeout(
+				feedTimeSeconds);
+	}
 
 	Command waitUntilReady =
 		Commands.waitUntil(
@@ -890,21 +912,25 @@ private Command withAutoCleanup(Command autoCommand) {
 private Command moveClimberUntil(
 	double output,
 	BooleanSupplier finished) {
-	return Commands.runEnd(
+	Command realClimberMovement =
+		Commands.runEnd(
 		() -> climberSubsystem.runMotor(output),
 		climberSubsystem::stopMotor,
 		climberSubsystem)
-			.until(
-				() ->
-					RobotBase.isSimulation()
-						|| finished.getAsBoolean());
+			.until(finished);
+
+	return Commands.either(
+		Commands.waitSeconds(
+			SIMULATED_CLIMBER_MOVE_TIME),
+		realClimberMovement,
+		RobotBase::isSimulation);
 }
 
 private void configureAutoSelector() {
 	autoChooser.setDefaultOption(
 		"Do Nothing",
 		withAutoCleanup(
-			Commands.runOnce(()->ballIntakeSubsystem.openServo())));
+			Commands.none()));
 
 	autoChooser.addOption(
 		"Open Intake",
@@ -1085,7 +1111,7 @@ private void configureAutoSelector() {
 				drivebase.followPath(
 					"LEFT_INSANITY_1"),
 
-				createAimAndShootAuto(1.5),
+				createAimAndShootAuto(1),
 
 				drivebase.followPath(
 					"LEFT_INSANITY_2"),
@@ -1095,11 +1121,47 @@ private void configureAutoSelector() {
 						-1.0,
 						climberSubsystem::isAtTop),
 
-					createAimAndShootAutoNoShake(1.0)),
+					createAimAndShootAutoNoShake(1)),
 
 				drivebase.followPath(
 					"LEFT_INSANITY_3"),
 
+				moveClimberUntil(
+					0.9,
+					climberSubsystem::isAtBottom))));
+
+	autoChooser.addOption(
+		"LEFT_RHS_BALLS",
+		withAutoCleanup(
+			Commands.sequence(
+				// drop intake before we move
+				Commands.runOnce(
+					ballIntakeSubsystem::openServo,
+					ballIntakeSubsystem),
+
+				drivebase.followPath(
+					"LEFT_RHS_BALLS_1"),
+
+				createAimAndShootAuto(1.5),
+
+				// START_INTAKE and STOP_INTAKE are in this path
+				drivebase.followPath(
+					"LEFT_RHS_BALLS_2"),
+
+				// start climbing while we shoot, then keep climbing through path 3
+				Commands.parallel(
+					moveClimberUntil(
+						-1.0,
+						climberSubsystem::isAtTop),
+
+					Commands.sequence(
+						createAimAndShootAutoNoShakeUntilInterrupted()
+							.withTimeout(1.5),
+
+						drivebase.followPath(
+							"LEFT_RHS_BALLS_3"))),
+
+				// pull down after were lined up with the tower
 				moveClimberUntil(
 					0.9,
 					climberSubsystem::isAtBottom))));
