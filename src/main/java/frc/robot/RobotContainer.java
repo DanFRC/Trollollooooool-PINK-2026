@@ -751,6 +751,21 @@ private Command createAimAndShootAuto() {
 
 private Command createAimAndShootAuto(
 	double feedTimeSeconds) {
+	return createAimAndShootAuto(
+		feedTimeSeconds,
+		true);
+}
+
+private Command createAimAndShootAutoNoShake(
+	double feedTimeSeconds) {
+	return createAimAndShootAuto(
+		feedTimeSeconds,
+		false);
+}
+
+private Command createAimAndShootAuto(
+	double feedTimeSeconds,
+	boolean shakeBeforeShooting) {
 	AimAtHopper autoAim =
 		new AimAtHopper(
 			drivebase,
@@ -829,7 +844,9 @@ private Command createAimAndShootAuto(
 				ballIntakeSubsystem),
 
 			// swerve shimmy
-			shakeIntake,
+			shakeBeforeShooting
+				? shakeIntake
+				: Commands.none(),
 
 			// aim and spin up at the same time
 			Commands.deadline(
@@ -877,7 +894,10 @@ private Command moveClimberUntil(
 		() -> climberSubsystem.runMotor(output),
 		climberSubsystem::stopMotor,
 		climberSubsystem)
-			.until(finished);
+			.until(
+				() ->
+					RobotBase.isSimulation()
+						|| finished.getAsBoolean());
 }
 
 private void configureAutoSelector() {
@@ -1053,6 +1073,36 @@ private void configureAutoSelector() {
 
 			))
 	);
+
+	autoChooser.addOption(
+		"LEFT_INSANITY",
+		withAutoCleanup(
+			Commands.sequence(
+				Commands.runOnce(
+					ballIntakeSubsystem::openServo,
+					ballIntakeSubsystem),
+
+				drivebase.followPath(
+					"LEFT_INSANITY_1"),
+
+				createAimAndShootAuto(1.5),
+
+				drivebase.followPath(
+					"LEFT_INSANITY_2"),
+
+				Commands.parallel(
+					moveClimberUntil(
+						-1.0,
+						climberSubsystem::isAtTop),
+
+					createAimAndShootAutoNoShake(1.0)),
+
+				drivebase.followPath(
+					"LEFT_INSANITY_3"),
+
+				moveClimberUntil(
+					0.9,
+					climberSubsystem::isAtBottom))));
 
 	SmartDashboard.putData(
 		"Autonomous Selector",
