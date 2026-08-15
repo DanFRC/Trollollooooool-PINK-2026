@@ -98,6 +98,20 @@ public class ClimberSubsystem extends SubsystemBase {
   }
 
   public void runMotor(double requestedOutput) {
+	  runMotor(
+	      requestedOutput,
+	      true);
+  }
+
+  public void runMotorAuto(double requestedOutput) {
+	  runMotor(
+	      requestedOutput,
+	      false);
+  }
+
+  private void runMotor(
+	  double requestedOutput,
+	  boolean useSlowZone) {
     double output =
         MathUtil.clamp(requestedOutput, -1.0, 1.0);
 
@@ -125,7 +139,9 @@ public class ClimberSubsystem extends SubsystemBase {
         output > 0.0
             && position <= MIN_POSITION + slowZone;
 
-    if (approachingMaximum || approachingMinimum) {
+    if (
+		useSlowZone
+			&& (approachingMaximum || approachingMinimum)) {
       output *= SLOW_SPEED_MULTIPLIER;
     }
 

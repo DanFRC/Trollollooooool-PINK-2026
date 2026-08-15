@@ -12,7 +12,6 @@ public class TheStickSubsystem extends SubsystemBase {
 	private static final String MIKU_FLICKER = "m";
 	private static final String SOLID_RED = "1";
 	private static final String SOLID_GREEN = "2";
-	private static final String GREEN_FLICKER = "g";
     private static final String DISABLED_MODE = "3";
     private static final String POLICE_MODE = "p";
 	private static final String HEARTBEAT = "h";
@@ -24,7 +23,6 @@ public class TheStickSubsystem extends SubsystemBase {
 
 	private boolean intaking = false;
 	private boolean shooterRunning = false;
-	private boolean indexing = false;
     private boolean shuttling = false;
 
 	private String currentCommand = "";
@@ -63,7 +61,7 @@ public class TheStickSubsystem extends SubsystemBase {
 	}
 
 	public void setIndexing(boolean active) {
-		indexing = active;
+		// indexing doesnt change the leds anymore
 	}
 
     public void setShuttling(boolean active) {
@@ -103,12 +101,8 @@ public class TheStickSubsystem extends SubsystemBase {
         } else if (shuttling) {
             wantedCommand = POLICE_MODE;
 
-        // balls are actually going into shooter
-        } else if (shooterRunning && indexing) {
-            wantedCommand = GREEN_FLICKER;
-
-        // shooter is ready
-        } else if (
+		// shooter is ready
+		} else if (
             shooterRunning
                 && shooterReady.getAsBoolean()) {
 
@@ -119,8 +113,8 @@ public class TheStickSubsystem extends SubsystemBase {
             wantedCommand = SOLID_RED;
 
         // collecting balls
-        } else if (intaking || indexing) {
-            wantedCommand = MIKU_FLICKER;
+		} else if (intaking) {
+			wantedCommand = MIKU_FLICKER;
 
         // just driving around
         } else {
@@ -160,10 +154,6 @@ public class TheStickSubsystem extends SubsystemBase {
 
         if (command.equals(SOLID_GREEN)) {
             return "Shooter Ready - Green";
-        }
-
-        if (command.equals(GREEN_FLICKER)) {
-            return "Shooting - Green Flicker";
         }
 
         return "Unknown Command: " + command;

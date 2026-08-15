@@ -12,10 +12,10 @@ public class ConveyorSubsystem extends SubsystemBase {
   private static final double STOPPED_THRESHOLD = 0.001;
 
   private static final String ACTION_KEY =
-      "Shooter/Current Action";
+      "Conveyor/Current Action";
 
   private static final String POWER_KEY =
-      "Shooter/Selected Power";
+      "Conveyor/Selected Power";
 
   private final VictorSPX conveyorMotor =
       new VictorSPX(CONVEYOR_MOTOR_ID);

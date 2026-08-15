@@ -450,19 +450,37 @@ private void configureBindings() {
 					shooterSubsystem.increasePowerBy(
 						-SHOOTER_POWER_STEP)));
 
-	// left trigger runs indexer and conveyor like teleop
+	// left trigger runs floor intake at full power like teleop
 	driverXbox
 		.leftTrigger(TRIGGER_DEADBAND)
 		.and(testEnabled)
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
-					double power =
-						driverXbox
-							.getLeftTriggerAxis();
+					ballIntakeSubsystem.openServo();
+					ballIntakeSubsystem.runMotor(
+						BALL_INTAKE_POWER);
 
-					intakeSubsystem.runMotor(power);
-					conveyorSubsystem.runMotor(power);
+					theStickSubsystem
+						.setIntaking(true);
+				},
+				() -> {
+					ballIntakeSubsystem.stopMotor();
+
+					theStickSubsystem
+						.setIntaking(false);
+				},
+				ballIntakeSubsystem));
+
+	// x runs indexer and conveyor at full power like teleop
+	driverXbox
+		.x()
+		.and(testEnabled)
+		.whileTrue(
+			Commands.runEnd(
+				() -> {
+					intakeSubsystem.runMotor(1.0);
+					conveyorSubsystem.runMotor(1.0);
 
 					theStickSubsystem
 						.setIndexing(true);
@@ -611,33 +629,28 @@ private void configureBindings() {
 					shooterSubsystem.increasePowerBy(
 						-SHOOTER_POWER_STEP)));
 
-	// run indexer and conveyor
+	// run the floor intake
 	driverXbox
 		.leftTrigger(TRIGGER_DEADBAND)
 		.and(teleopEnabled)
-		.and(rightTrigger.and(shuttleZone).negate())
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
-					double power =
-						driverXbox
-							.getLeftTriggerAxis();
+					ballIntakeSubsystem.openServo();
 
-					intakeSubsystem.runMotor(power);
-					conveyorSubsystem.runMotor(power);
+					ballIntakeSubsystem.runMotor(
+						BALL_INTAKE_POWER);
 
 					theStickSubsystem
-						.setIndexing(true);
+						.setIntaking(true);
 				},
 				() -> {
-					intakeSubsystem.runMotor(0.0);
-					conveyorSubsystem.runMotor(0.0);
+					ballIntakeSubsystem.stopMotor();
 
 					theStickSubsystem
-						.setIndexing(false);
+						.setIntaking(false);
 				},
-				intakeSubsystem,
-				conveyorSubsystem));
+				ballIntakeSubsystem));
 
 	// climber down
 	driverXbox
@@ -686,29 +699,29 @@ private void configureBindings() {
 			climberSubsystem::stopMotor,
 			climberSubsystem));
 
-	// run the big ball intake
+	// run indexer and conveyor
 	driverXbox
 		.x()
 		.and(teleopEnabled)
+		.and(rightTrigger.and(shuttleZone).negate())
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
-
-					ballIntakeSubsystem.openServo();
-
-					ballIntakeSubsystem.runMotor(
-						BALL_INTAKE_POWER);
+					intakeSubsystem.runMotor(1.0);
+					conveyorSubsystem.runMotor(1.0);
 
 					theStickSubsystem
-						.setIntaking(true);
+						.setIndexing(true);
 				},
 				() -> {
-					ballIntakeSubsystem.stopMotor();
+					intakeSubsystem.runMotor(0.0);
+					conveyorSubsystem.runMotor(0.0);
 
 					theStickSubsystem
-						.setIntaking(false);
+						.setIndexing(false);
 				},
-				ballIntakeSubsystem));
+				intakeSubsystem,
+				conveyorSubsystem));
 
 	// reset field direction
 	driverXbox
@@ -914,7 +927,7 @@ private Command moveClimberUntil(
 	BooleanSupplier finished) {
 	Command realClimberMovement =
 		Commands.runEnd(
-		() -> climberSubsystem.runMotor(output),
+		() -> climberSubsystem.runMotorAuto(output),
 		climberSubsystem::stopMotor,
 		climberSubsystem)
 			.until(finished);
@@ -1009,10 +1022,10 @@ private void configureAutoSelector() {
 		withAutoCleanup(
 			Commands.sequence(
 				moveClimberUntil(
-					-0.5,
+					-1.0,
 					climberSubsystem::isAtTop),
 				moveClimberUntil(
-					0.5,
+					1.0,
 					climberSubsystem::isAtBottom)
 			))
 	);
@@ -1037,7 +1050,7 @@ private void configureAutoSelector() {
 			),
 
 			moveClimberUntil(
-				0.9,
+				1.0,
 				climberSubsystem::isAtBottom)
 
 			))
@@ -1066,7 +1079,7 @@ private void configureAutoSelector() {
 			),
 
 			moveClimberUntil(
-				0.9,
+				1.0,
 				climberSubsystem::isAtBottom)
 
 			))
@@ -1094,7 +1107,7 @@ private void configureAutoSelector() {
 			),
 
 			moveClimberUntil(
-				0.8,
+				1.0,
 				climberSubsystem::isAtBottom)
 
 			))
@@ -1127,7 +1140,7 @@ private void configureAutoSelector() {
 					"LEFT_INSANITY_3"),
 
 				moveClimberUntil(
-					0.9,
+					1.0,
 					climberSubsystem::isAtBottom))));
 
 	autoChooser.addOption(
@@ -1163,7 +1176,7 @@ private void configureAutoSelector() {
 
 				// pull down after were lined up with the tower
 				moveClimberUntil(
-					0.9,
+					1.0,
 					climberSubsystem::isAtBottom))));
 
 	SmartDashboard.putData(
@@ -1205,6 +1218,19 @@ private void configureAutoSelector() {
 							new Pose2d(
 								4.0,
 								0.65,
+								Rotation2d.fromDegrees(0.0)))),
+				drivebase)
+					.ignoringDisable(true));
+
+	SmartDashboard.putData(
+			"Auto/Set Start - SNEAKY",
+			Commands.runOnce(
+				() ->
+					drivebase.resetOdometry(
+						getAllianceStartPose(
+							new Pose2d(
+								3.500,
+								6.625,
 								Rotation2d.fromDegrees(0.0)))),
 				drivebase)
 					.ignoringDisable(true));
