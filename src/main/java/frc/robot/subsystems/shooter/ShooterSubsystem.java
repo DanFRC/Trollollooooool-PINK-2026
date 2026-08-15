@@ -19,7 +19,7 @@ public class ShooterSubsystem extends SubsystemBase {
 		8192.0;
 
 	private static final double MIN_DISTANCE_METERS = 0.0;
-	private static final double MAX_DISTANCE_METERS = 3.0;
+	private static final double MAX_DISTANCE_METERS = 10.0;
 
 	// how close we need to be for the green light
 	private static final double RPM_TOLERANCE = 450.0;
@@ -116,6 +116,15 @@ public class ShooterSubsystem extends SubsystemBase {
 		distanceToRPM.put(2.00, 3180.0);
 		distanceToRPM.put(2.50, 3339.0);
 		distanceToRPM.put(3.00, 3610.0);
+		distanceToRPM.put(3.50, 3800.0);
+		distanceToRPM.put(4.00, 4000.0);
+		distanceToRPM.put(4.50, 4200.0);
+		distanceToRPM.put(5.00, 4500.0);
+		distanceToRPM.put(5.50, 4600.0);
+		distanceToRPM.put(6.00, 4700.0);
+		distanceToRPM.put(6.50, 4750.0);
+		distanceToRPM.put(7.00, 5000.0);;
+
 	}
 
 	public double getTargetRPM(double distanceMeters) {

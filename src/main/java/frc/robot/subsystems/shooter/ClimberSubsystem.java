@@ -7,6 +7,7 @@ package frc.robot.subsystems.shooter;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.VictorSPX;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.Servo;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -16,7 +17,7 @@ import frc.robot.Constants.DrivebaseConstants;
 public class ClimberSubsystem extends SubsystemBase {
   private static final int CLIMBER_MOTOR_ID = 15;
   private static final int SERVO_ID = 1;
-  private static final double SERVO_OPEN_POINT = 1.0;
+  private static final double SERVO_OPEN_POINT = 0.0;
 
   private static final int ENCODER_CHANNEL_A = 5;
   private static final int ENCODER_CHANNEL_B = 6;
@@ -27,11 +28,16 @@ public class ClimberSubsystem extends SubsystemBase {
   private static final double MIN_POSITION =
       DrivebaseConstants.climberMinPosition;
 
+  private boolean stopTop = false;
+  private boolean stopBottom = false;
+
   private static final double SLOW_ZONE_PERCENT = 0.10;
   private static final double SLOW_SPEED_MULTIPLIER = 0.5;
 
   // Publish telemetry every 100 ms instead of every 20 ms.
   private static final int TELEMETRY_PERIOD_LOOPS = 5;
+
+  private PIDController pid = new PIDController(0.001, 0, 0);
 
   private final VictorSPX climberMotor =
       new VictorSPX(CLIMBER_MOTOR_ID);
@@ -50,6 +56,22 @@ public class ClimberSubsystem extends SubsystemBase {
     climberServo.set(SERVO_OPEN_POINT);
   }
 
+  public boolean isAtTop() {
+    return stopTop;
+  }
+
+  public boolean isAtBottom() {
+    return stopBottom;
+  }
+
+  public void openServo() {
+    climberServo.set(SERVO_OPEN_POINT);
+  }
+
+  public void runMotorFailsafe(double output) {
+    climberMotor.set(ControlMode.PercentOutput, output);
+  }
+
   @Override
   public void periodic() {
     telemetryCounter++;
@@ -65,6 +87,17 @@ public class ClimberSubsystem extends SubsystemBase {
       "Climber/Servo Position",
       climberServo.get()
     );
+
+    if (positionEncoder.get() >= MAX_POSITION) {
+      stopTop = true;
+      stopBottom = false;
+    } else if (positionEncoder.get() <= MIN_POSITION) {
+      stopTop = false;
+      stopBottom = true;
+    } else {
+      stopTop = false;
+      stopBottom = false;
+    }
   }
 
   public void runMotor(double requestedOutput) {
@@ -102,6 +135,7 @@ public class ClimberSubsystem extends SubsystemBase {
     climberMotor.set(
         ControlMode.PercentOutput,
         output);
+
   }
 
   public void stopMotor() {

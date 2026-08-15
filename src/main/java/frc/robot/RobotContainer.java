@@ -42,7 +42,7 @@ public class RobotContainer {
     private static final double TRIGGER_DEADBAND = 0.01;
     private static final double SHOOTER_POWER_STEP = 0.01;
     private static final double TEST_DRIVE_SCALE = 0.2;
-    private static final double BALL_INTAKE_POWER = 0.8;
+    private static final double BALL_INTAKE_POWER = 1.0;
 
     private static final double AUTO_SHOOT_TIMEOUT = 4.0;
     private static final double AUTO_FEED_TIME = 2.0;
@@ -152,6 +152,9 @@ public class RobotContainer {
 
     private final CommandXboxController driverXbox =
       new CommandXboxController(0);
+
+	private final CommandXboxController backupXbox = 
+	  new CommandXboxController(1);
 
     private final SwerveSubsystem drivebase =
       new SwerveSubsystem(
@@ -610,7 +613,7 @@ private void configureBindings() {
 	driverXbox
 		.leftTrigger(TRIGGER_DEADBAND)
 		.and(teleopEnabled)
-		.and(rightTrigger.negate())
+		.and(rightTrigger.and(shuttleZone).negate())
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
@@ -640,8 +643,10 @@ private void configureBindings() {
 		.and(teleopEnabled)
 		.whileTrue(
 			Commands.runEnd(
-				() ->
-					climberSubsystem.runMotor(1.0),
+				() -> {
+					climberSubsystem.openServo();
+					climberSubsystem.runMotor(1.0);
+				},
 				climberSubsystem::stopMotor,
 				climberSubsystem));
 
@@ -651,10 +656,33 @@ private void configureBindings() {
 		.and(teleopEnabled)
 		.whileTrue(
 			Commands.runEnd(
-				() ->
-					climberSubsystem.runMotor(-1.0),
+				() -> {
+					climberSubsystem.openServo();
+					climberSubsystem.runMotor(-1.0);
+				},
 				climberSubsystem::stopMotor,
 				climberSubsystem));
+
+	// backup climber down
+	backupXbox
+	    .povDown()
+		.and(teleopEnabled)
+		.whileTrue(
+			Commands.runEnd(() -> {
+				climberSubsystem.runMotorFailsafe(1.0);
+			}, 
+			climberSubsystem::stopMotor,
+			climberSubsystem));
+
+	backupXbox
+	    .povUp()
+		.and(teleopEnabled)
+		.whileTrue(
+			Commands.runEnd(() -> {
+				climberSubsystem.runMotorFailsafe(-1.0);
+			}, 
+			climberSubsystem::stopMotor,
+			climberSubsystem));
 
 	// run the big ball intake
 	driverXbox
@@ -663,6 +691,9 @@ private void configureBindings() {
 		.whileTrue(
 			Commands.runEnd(
 				() -> {
+
+					ballIntakeSubsystem.openServo();
+
 					ballIntakeSubsystem.runMotor(
 						BALL_INTAKE_POWER);
 
@@ -849,10 +880,11 @@ private void configureAutoSelector() {
 	autoChooser.addOption(
 		"MIDDLE AUTO",
 		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
 			drivebase.pathfindThenFollowPath(
 				"MIDDLE_AUTO"),
 
-			createAimAndShootAuto(1.5),
+			createAimAndShootAuto(2),
 
 			drivebase.followPath(
 				"MIDDLE_AUTO_HUMAN_PLAYER"))
@@ -864,12 +896,14 @@ private void configureAutoSelector() {
 		
 
 	autoChooser.addOption(
-		"FULL BALL AUTO + SHOOT",
+		"LEFT_AUTO",
 		Commands.sequence(
 			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
 			// start wherever vision says we are
 			drivebase.pathfindThenFollowPath(
 				"GO_FRONT_HOPPER"),
+
+			createAimAndShootAuto(2),
 
 			// grab balls then return to our zone
 			drivebase.followPath(
@@ -882,6 +916,104 @@ private void configureAutoSelector() {
 						stopAutoIntake();
 						stopPathShooting();
 					}));
+
+	autoChooser.addOption(
+		"RIGHT_AUTO", 
+		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
+
+			// shooting
+			drivebase.followPath(
+				"RIGHT_1"
+			),
+
+			createAimAndShootAuto(1.5),
+
+
+
+			drivebase.followPath(
+				"RIGHT_2"
+			),
+
+			createAimAndShootAuto(2)
+
+		)
+	);
+
+	autoChooser.addOption("LIFT_AND_UNLIFT", 
+		Commands.sequence(
+			Commands.run(() -> climberSubsystem.runMotor(-0.5)).until(() -> climberSubsystem.isAtTop() == true),
+			Commands.run(() -> climberSubsystem.runMotor(0.5)).until(() -> climberSubsystem.isAtBottom() == true)
+		)
+	);
+
+	autoChooser.addOption(
+		"RIGHT_CLIMB", 
+		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
+
+			// shooting
+			drivebase.followPath(
+				"RIGHT_1"
+			),
+
+			Commands.run(() -> climberSubsystem.runMotor(-1)).until(() -> climberSubsystem.isAtTop() == true),
+
+			drivebase.followPath(
+				"RIGHT_CLIMB_1"
+			),
+
+			Commands.run(() -> climberSubsystem.runMotor(0.9)).until(() -> climberSubsystem.isAtBottom() == true)
+
+		)
+	);
+
+	autoChooser.addOption(
+		"LEFT_CLIMB", 
+		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
+
+			// shooting
+			drivebase.followPath(
+				"GO_FRONT_HOPPER"
+			),
+
+			createAimAndShootAuto(1.5),
+
+			Commands.run(() -> climberSubsystem.runMotor(-1)).until(() -> climberSubsystem.isAtTop() == true),
+
+
+			drivebase.followPath(
+				"LEFT_CLIMB"
+			),
+
+			Commands.run(() -> climberSubsystem.runMotor(0.9)).until(() -> climberSubsystem.isAtBottom() == true)
+
+		)
+	);
+
+	autoChooser.addOption(
+		"MIDDE_CLIMB", 
+		Commands.sequence(
+			Commands.runOnce(()->ballIntakeSubsystem.openServo()),
+
+			// shooting
+			drivebase.followPath(
+				"MIDDLE_CLIMB_1"
+			),
+
+			createAimAndShootAuto(1.5),
+
+			Commands.run(() -> climberSubsystem.runMotor(-1)).until(() -> climberSubsystem.isAtTop() == true),
+
+			drivebase.followPath(
+				"MIDDLE_CLIMB_2"
+			),
+
+			Commands.run(() -> climberSubsystem.runMotor(0.8)).until(() -> climberSubsystem.isAtBottom() == true)
+
+		)
+	);
 
 	SmartDashboard.putData(
 		"Autonomous Selector",

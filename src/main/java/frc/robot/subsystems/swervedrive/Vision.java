@@ -312,65 +312,65 @@ public final class Vision {
 	private boolean isMeasurementValid(
 		String cameraName,
 		EstimatedRobotPose measurement) {
-		Pose3d pose3d =
-			measurement.estimatedPose;
+		// Pose3d pose3d =
+		// 	measurement.estimatedPose;
 
-		Pose2d pose2d =
-			pose3d.toPose2d();
+		// Pose2d pose2d =
+		// 	pose3d.toPose2d();
 
-		boolean insideField =
-			pose2d.getX() >= 0.0
-				&& pose2d.getX()
-					<= FIELD_LAYOUT.getFieldLength()
-				&& pose2d.getY() >= 0.0
-				&& pose2d.getY()
-					<= FIELD_LAYOUT.getFieldWidth();
+		// boolean insideField =
+		// 	pose2d.getX() >= 0.0
+		// 		&& pose2d.getX()
+		// 			<= FIELD_LAYOUT.getFieldLength()
+		// 		&& pose2d.getY() >= 0.0
+		// 		&& pose2d.getY()
+		// 			<= FIELD_LAYOUT.getFieldWidth();
 
-		if (!insideField) {
-			recordRejection(
-				cameraName,
-				RejectionReason.OUTSIDE_FIELD);
+		// if (!insideField) {
+		// 	recordRejection(
+		// 		cameraName,
+		// 		RejectionReason.OUTSIDE_FIELD);
 
-			return false;
-		}
+		// 	return false;
+		// }
 
-		if (Math.abs(pose3d.getZ())
-			> MAX_POSE_HEIGHT_ERROR_METERS) {
+		// if (Math.abs(pose3d.getZ())
+		// 	> MAX_POSE_HEIGHT_ERROR_METERS) {
 
-			recordRejection(
-				cameraName,
-				RejectionReason.HEIGHT);
+		// 	recordRejection(
+		// 		cameraName,
+		// 		RejectionReason.HEIGHT);
 
-			return false;
-		}
+		// 	return false;
+		// }
 
-		if (measurement.targetsUsed.isEmpty()) {
-			recordRejection(
-				cameraName,
-				RejectionReason.NO_TARGETS);
+		// if (measurement.targetsUsed.isEmpty()) {
+		// 	recordRejection(
+		// 		cameraName,
+		// 		RejectionReason.NO_TARGETS);
 
-			return false;
-		}
+		// 	return false;
+		// }
 
-		if (measurement.targetsUsed.size() > 1) {
-			return true;
-		}
+		// if (measurement.targetsUsed.size() > 1) {
+		// 	return true;
+		// }
 
 		PhotonTrackedTarget target =
 			measurement.targetsUsed.get(0);
 
-		double ambiguity =
-			target.getPoseAmbiguity();
+		// double ambiguity =
+		// 	target.getPoseAmbiguity();
 
-		if (ambiguity < 0.0
-			|| ambiguity > MAX_SINGLE_TAG_AMBIGUITY) {
+		// if (ambiguity < 0.0
+		// 	|| ambiguity > MAX_SINGLE_TAG_AMBIGUITY) {
 
-			recordRejection(
-				cameraName,
-				RejectionReason.AMBIGUITY);
+		// 	recordRejection(
+		// 		cameraName,
+		// 		RejectionReason.AMBIGUITY);
 
-			return false;
-		}
+		// 	return false;
+		// }
 
 		double distance =
 			target
@@ -386,9 +386,11 @@ public final class Vision {
 				RejectionReason.DISTANCE);
 
 			return false;
+		} else {
+			return true;
 		}
 
-		return true;
+		
 	}
 
 	private void updateCameraDiagnostics(
