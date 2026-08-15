@@ -7,7 +7,6 @@ package frc.robot.subsystems.shooter;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.VictorSPX;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.Servo;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -36,8 +35,6 @@ public class ClimberSubsystem extends SubsystemBase {
 
   // Publish telemetry every 100 ms instead of every 20 ms.
   private static final int TELEMETRY_PERIOD_LOOPS = 5;
-
-  private PIDController pid = new PIDController(0.001, 0, 0);
 
   private final VictorSPX climberMotor =
       new VictorSPX(CLIMBER_MOTOR_ID);
@@ -121,11 +118,11 @@ public class ClimberSubsystem extends SubsystemBase {
             * SLOW_ZONE_PERCENT;
 
     boolean approachingMaximum =
-        output > 0.0
+        output < 0.0
             && position >= MAX_POSITION - slowZone;
 
     boolean approachingMinimum =
-        output < 0.0
+        output > 0.0
             && position <= MIN_POSITION + slowZone;
 
     if (approachingMaximum || approachingMinimum) {

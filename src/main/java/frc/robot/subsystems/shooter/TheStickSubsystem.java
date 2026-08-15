@@ -200,6 +200,14 @@ public class TheStickSubsystem extends SubsystemBase {
 
 				serialWarningSent = true;
 			}
+
+			try {
+				theStick.close();
+			} catch (Exception ignored) {
+				// port already disappeared
+			}
+
+			theStick = null;
 		}
 	}
 }
