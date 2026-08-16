@@ -11,6 +11,7 @@ import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import java.util.EnumMap;
@@ -31,6 +32,7 @@ public final class Vision {
 	private static final double MAX_SINGLE_TAG_AMBIGUITY = 0.20;
 	private static final double MAX_SINGLE_TAG_DISTANCE_METERS = 4.0;
 	private static final double MAX_POSE_HEIGHT_ERROR_METERS = 0.50;
+	private static final double MAX_ENABLED_POSE_JUMP_METERS = 1.50;
 
 	private static final int TELEMETRY_PERIOD_LOOPS = 10;
 
@@ -100,6 +102,7 @@ public final class Vision {
 		int tagCount,
 		double ambiguity,
 		double averageDistanceMeters,
+		double distanceFromOdometryMeters,
 		String result) {}
 
 	private enum RejectionReason {
@@ -108,7 +111,8 @@ public final class Vision {
 		HEIGHT,
 		NO_TARGETS,
 		AMBIGUITY,
-		DISTANCE
+		DISTANCE,
+		POSE_JUMP
 	}
 
 	private final List<CameraConfig> cameras =
@@ -225,7 +229,8 @@ public final class Vision {
 			Optional<VisionMeasurement> measurement =
 				createMeasurement(
 					cameraConfig,
-					result);
+					result,
+					swerveDrive.getPose());
 
 			if (measurement.isEmpty()) {
 				continue;
@@ -239,7 +244,8 @@ public final class Vision {
 
 	private Optional<VisionMeasurement> createMeasurement(
 		CameraConfig cameraConfig,
-		PhotonPipelineResult result) {
+		PhotonPipelineResult result,
+		Pose2d currentOdometryPose) {
 
 		if (!result.hasTargets()) {
 			return Optional.empty();
@@ -268,11 +274,13 @@ public final class Vision {
 		updateCameraDiagnostics(
 			cameraConfig.name(),
 			estimate.get(),
+			currentOdometryPose,
 			"Checking");
 
 		if (!isMeasurementValid(
 			cameraConfig.name(),
-			estimate.get())) {
+			estimate.get(),
+			currentOdometryPose)) {
 
 			return Optional.empty();
 		}
@@ -311,74 +319,79 @@ public final class Vision {
 
 	private boolean isMeasurementValid(
 		String cameraName,
-		EstimatedRobotPose measurement) {
-		// Pose3d pose3d =
-		// 	measurement.estimatedPose;
+		EstimatedRobotPose measurement,
+		Pose2d currentOdometryPose) {
 
-		// Pose2d pose2d =
-		// 	pose3d.toPose2d();
+		Pose3d pose3d =
+			measurement.estimatedPose;
 
-		// boolean insideField =
-		// 	pose2d.getX() >= 0.0
-		// 		&& pose2d.getX()
-		// 			<= FIELD_LAYOUT.getFieldLength()
-		// 		&& pose2d.getY() >= 0.0
-		// 		&& pose2d.getY()
-		// 			<= FIELD_LAYOUT.getFieldWidth();
+		Pose2d pose2d =
+			pose3d.toPose2d();
 
-		// if (!insideField) {
-		// 	recordRejection(
-		// 		cameraName,
-		// 		RejectionReason.OUTSIDE_FIELD);
+		boolean insideField =
+			pose2d.getX() >= 0.0
+				&& pose2d.getX()
+					<= FIELD_LAYOUT.getFieldLength()
+				&& pose2d.getY() >= 0.0
+				&& pose2d.getY()
+					<= FIELD_LAYOUT.getFieldWidth();
 
-		// 	return false;
-		// }
+		if (!insideField) {
+			recordRejection(
+				cameraName,
+				RejectionReason.OUTSIDE_FIELD);
 
-		// if (Math.abs(pose3d.getZ())
-		// 	> MAX_POSE_HEIGHT_ERROR_METERS) {
+			return false;
+		}
 
-		// 	recordRejection(
-		// 		cameraName,
-		// 		RejectionReason.HEIGHT);
+		if (Math.abs(pose3d.getZ())
+			> MAX_POSE_HEIGHT_ERROR_METERS) {
 
-		// 	return false;
-		// }
+			recordRejection(
+				cameraName,
+				RejectionReason.HEIGHT);
 
-		// if (measurement.targetsUsed.isEmpty()) {
-		// 	recordRejection(
-		// 		cameraName,
-		// 		RejectionReason.NO_TARGETS);
+			return false;
+		}
 
-		// 	return false;
-		// }
+		if (measurement.targetsUsed.isEmpty()) {
+			recordRejection(
+				cameraName,
+				RejectionReason.NO_TARGETS);
 
-		// if (measurement.targetsUsed.size() > 1) {
-		// 	return true;
-		// }
+			return false;
+		}
 
-		PhotonTrackedTarget target =
-			measurement.targetsUsed.get(0);
+		if (measurement.targetsUsed.size() == 1) {
+			PhotonTrackedTarget target =
+				measurement.targetsUsed.get(0);
 
-		// double ambiguity =
-		// 	target.getPoseAmbiguity();
+			double ambiguity =
+				target.getPoseAmbiguity();
 
-		// if (ambiguity < 0.0
-		// 	|| ambiguity > MAX_SINGLE_TAG_AMBIGUITY) {
+			if (ambiguity < 0.0
+				|| ambiguity > MAX_SINGLE_TAG_AMBIGUITY) {
 
-		// 	recordRejection(
-		// 		cameraName,
-		// 		RejectionReason.AMBIGUITY);
+				recordRejection(
+					cameraName,
+					RejectionReason.AMBIGUITY);
 
-		// 	return false;
-		// }
+				return false;
+			}
+		}
 
-		double distance =
-			target
-				.getBestCameraToTarget()
-				.getTranslation()
-				.getNorm();
+		double averageDistance =
+			measurement.targetsUsed.stream()
+				.mapToDouble(
+					target ->
+						target
+							.getBestCameraToTarget()
+							.getTranslation()
+							.getNorm())
+				.average()
+				.orElse(Double.POSITIVE_INFINITY);
 
-		if (distance
+		if (averageDistance
 			> MAX_SINGLE_TAG_DISTANCE_METERS) {
 
 			recordRejection(
@@ -386,16 +399,32 @@ public final class Vision {
 				RejectionReason.DISTANCE);
 
 			return false;
-		} else {
-			return true;
 		}
 
-		
+		double distanceFromOdometry =
+			pose2d
+				.getTranslation()
+				.getDistance(
+					currentOdometryPose.getTranslation());
+
+		if (DriverStation.isEnabled()
+			&& distanceFromOdometry
+				> MAX_ENABLED_POSE_JUMP_METERS) {
+
+			recordRejection(
+				cameraName,
+				RejectionReason.POSE_JUMP);
+
+			return false;
+		}
+
+		return true;
 	}
 
 	private void updateCameraDiagnostics(
 		String cameraName,
 		EstimatedRobotPose measurement,
+		Pose2d currentOdometryPose,
 		String result) {
 
 		int tagCount =
@@ -419,6 +448,14 @@ public final class Vision {
 				.average()
 				.orElse(Double.NaN);
 
+		double distanceFromOdometry =
+			measurement
+				.estimatedPose
+				.toPose2d()
+				.getTranslation()
+				.getDistance(
+					currentOdometryPose.getTranslation());
+
 		cameraDiagnostics.put(
 			cameraName,
 			new CameraDiagnostics(
@@ -426,6 +463,7 @@ public final class Vision {
 				tagCount,
 				ambiguity,
 				averageDistance,
+				distanceFromOdometry,
 				result));
 	}
 
@@ -447,6 +485,7 @@ public final class Vision {
 				diagnostics.tagCount(),
 				diagnostics.ambiguity(),
 				diagnostics.averageDistanceMeters(),
+				diagnostics.distanceFromOdometryMeters(),
 				result));
 	}
 
@@ -571,6 +610,10 @@ public final class Vision {
 				SmartDashboard.putNumber(
 					key + "/Average Tag Distance",
 					diagnostics.averageDistanceMeters());
+
+				SmartDashboard.putNumber(
+					key + "/Distance From Odometry",
+					diagnostics.distanceFromOdometryMeters());
 
 				SmartDashboard.putString(
 					key + "/Result",
