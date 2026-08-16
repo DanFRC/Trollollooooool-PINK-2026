@@ -969,8 +969,12 @@ private void configureAutoSelector() {
 
 				createAimAndShootAuto(1.5),
 
+				Commands.runOnce(() -> startAutoIntake()),
+
 				drivebase.followPath(
 					"MIDDLE_RAMP"),
+
+				Commands.runOnce(() -> stopAutoIntake()),
 					
 					createAimAndShootAuto(2))));
 
@@ -988,9 +992,13 @@ private void configureAutoSelector() {
 
 				createAimAndShootAuto(1.5),
 
+				Commands.runOnce(() -> startAutoIntake()),
+
 			// grab balls then return to our zone
 				drivebase.followPath(
 					"HOPPER_TO_BALLS_BACK_TO_ZONE"),
+
+			Commands.runOnce(() -> stopAutoIntake()),
 
 			// line up and shoot after the path finishes
 				createAimAndShootAuto())));
@@ -1008,11 +1016,13 @@ private void configureAutoSelector() {
 
 				createAimAndShootAuto(1.5),
 
-
+				Commands.runOnce(() -> startAutoIntake()),
 
 				drivebase.followPath(
 					"RIGHT_2"
 				),
+
+				Commands.runOnce(() -> stopAutoIntake()),
 
 				createAimAndShootAuto(2)
 
@@ -1028,6 +1038,18 @@ private void configureAutoSelector() {
 					1.0,
 					climberSubsystem::isAtBottom)
 			))
+	);
+
+	autoChooser.addOption("INTAKE TEST", 
+		withAutoCleanup(
+			Commands.sequence(
+
+		Commands.runOnce(() -> startAutoIntake()),
+
+		Commands.waitSeconds(3),
+
+		Commands.runOnce(() -> stopAutoIntake())
+		))
 	);
 
 	autoChooser.addOption(
@@ -1124,10 +1146,14 @@ private void configureAutoSelector() {
 				drivebase.followPath(
 					"LEFT_INSANITY_1"),
 
-				createAimAndShootAuto(1),
+				createAimAndShootAutoNoShake(1),
+
+				Commands.runOnce(() -> startAutoIntake()),
 
 				drivebase.followPath(
 					"LEFT_INSANITY_2"),
+
+				Commands.runOnce(() -> stopAutoIntake()),
 
 				Commands.parallel(
 					moveClimberUntil(
@@ -1138,6 +1164,35 @@ private void configureAutoSelector() {
 
 				drivebase.followPath(
 					"LEFT_INSANITY_3"),
+
+				moveClimberUntil(
+					1.0,
+					climberSubsystem::isAtBottom))));
+
+	autoChooser.addOption(
+		"LEFT_SAFE_INSANITY",
+		withAutoCleanup(
+			Commands.sequence(
+				Commands.runOnce(
+					ballIntakeSubsystem::openServo,
+					ballIntakeSubsystem),
+
+				drivebase.followPath(
+					"LEFT_INSANITY_1"),
+
+				createAimAndShootAutoNoShake(1),
+
+				drivebase.followPath(
+					"LEFT_SAFE_INSANITY_1.5"
+				),
+
+				Commands.parallel(
+				Commands.runOnce(() -> startAutoIntake()),
+				
+				Commands.runOnce(() -> moveClimberUntil(-1, climberSubsystem::isAtTop)),
+
+				drivebase.followPath(
+					"LEFT_SAFE_INSANITY_2")),
 
 				moveClimberUntil(
 					1.0,
@@ -1157,9 +1212,13 @@ private void configureAutoSelector() {
 
 				createAimAndShootAuto(1.5),
 
+				Commands.runOnce(() -> startAutoIntake()),
+
 				// START_INTAKE and STOP_INTAKE are in this path
 				drivebase.followPath(
 					"LEFT_RHS_BALLS_2"),
+
+				Commands.runOnce(() -> stopAutoIntake()),
 
 				// start climbing while we shoot, then keep climbing through path 3
 				Commands.parallel(
